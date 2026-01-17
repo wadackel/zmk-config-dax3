@@ -117,10 +117,10 @@
 
         Scroll {
             bindings = <
-&trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &trans  &trans  &trans  &trans  &trans                  &trans
+&trans  &trans  &trans                    &kp LG(LC(LA(K)))         &kp LG(LC(LA(M)))         &kp LG(LC(LA(C)))                              &trans           &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &kp LG(LC(LA(LEFT)))      &kp LC(LA(UP_ARROW))      &kp LG(LC(LA(DOWN)))      &kp LG(LC(LA(RIGHT)))                          &trans           &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &kp LG(LC(LA(NUMBER_1)))  &kp LG(LC(LA(NUMBER_2)))  &kp LG(LC(LA(NUMBER_3)))  &kp LG(LC(LA(NUMBER_4)))  &trans  &trans       &trans           &trans  &trans  &trans  &trans  &trans
+                &trans                    &trans                    &trans                    &trans                    &trans  &kp LC(TAB)  &kp LC(LS(TAB))                  &trans
             >;
 
             sensor-bindings = <&inc_dec_kp PG_UP PAGE_DOWN &inc_dec_kp UP DOWN>;
