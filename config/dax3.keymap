@@ -106,10 +106,10 @@
 
         Mouse {
             bindings = <
-&trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &trans  &trans  &trans  &trans  &trans                  &trans
+&trans  &trans  &trans  &trans  &trans  &trans                                    &kp F11                    &kp RG(R)  &kp RG(DOWN)  &kp RG(UP_ARROW)  &trans  &trans
+&trans  &trans  &trans  &trans  &trans  &trans                                    &kp RC(UP_ARROW)           &mkp MB1   &mkp MB3      &mkp MB2          &trans  &trans
+&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans                    &kp RC(DOWN)               &mkp MB4   &mkp MB5      &kp RG(W)         &trans  &trans
+                &trans  &trans  &trans  &trans  &trans  &kp RG(RS(LEFT_BRACKET))  &kp RG(RS(RIGHT_BRACKET))                           &trans
             >;
 
             sensor-bindings = <&inc_dec_kp PG_UP PAGE_DOWN &inc_dec_kp UP DOWN>;
