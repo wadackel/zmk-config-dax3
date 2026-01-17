@@ -1,0 +1,5 @@
+config SHIELD_DAX3_R
+  def_bool $(shields_list_contains,dax3_R)
+
+config SHIELD_DAX3_L
+  def_bool $(shields_list_contains,dax3_L)

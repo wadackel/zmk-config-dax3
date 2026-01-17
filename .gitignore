@@ -1,0 +1,14 @@
+# ZMK Local Build Environment
+build/
+.west/
+modules/
+zephyr/*
+!zephyr/module.yml
+zmk/
+zmk-pmw3610-driver/
+zmk-rgbled-widget/
+bootloader/
+*.uf2
+*.bin
+*.hex
+*.elf
