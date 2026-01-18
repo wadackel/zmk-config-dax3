@@ -79,7 +79,7 @@
                        &mo 5  &kp LEFT_ALT  &mt LEFT_GUI LANG2  &mt LEFT_SHIFT SPACE  &esc_lang2_with_layer 3 0  &lt 2 ENTER  &kp LANG1                      &kp BACKSPACE
             >;
 
-            sensor-bindings = <&inc_dec_kp C_BRI_UP C_BRI_DN &enc_scroll>;
+            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll>;
         };
 
         Symbol {
@@ -90,7 +90,7 @@
                          &trans         &trans            &trans       &trans                &trans  &trans  &trans                                              &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_BRI_UP C_BRI_DN &enc_scroll>;
+            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll>;
         };
 
         Num {
@@ -112,7 +112,7 @@
                                           &trans  &trans  &trans  &trans             &trans  &trans  &trans                                   &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_BRI_UP C_BRI_DN &enc_scroll>;
+            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll>;
         };
 
         Mouse {
@@ -123,7 +123,7 @@
                 &trans  &trans  &trans  &trans  &trans  &kp RG(RS(LEFT_BRACKET))  &kp RG(RS(RIGHT_BRACKET))                           &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_BRI_UP C_BRI_DN &enc_scroll>;
+            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll>;
         };
 
         Scroll {
@@ -134,7 +134,7 @@
                 &trans                    &trans                    &trans                    &trans                    &trans  &kp LC(TAB)  &kp LC(LS(TAB))                  &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_BRI_UP C_BRI_DN &enc_scroll>;
+            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll>;
         };
 
         Device {
@@ -145,7 +145,7 @@
                 &trans  &trans  &trans  &trans  &trans  &trans  &trans                                    &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_BRI_UP C_BRI_DN &enc_scroll>;
+            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll>;
         };
     };
 };
