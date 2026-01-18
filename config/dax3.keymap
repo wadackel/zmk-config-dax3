@@ -90,7 +90,7 @@
                          &trans         &trans            &trans       &trans                &trans  &trans  &trans                                              &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll>;
+            sensor-bindings = <&inc_dec_kp C_BRI_UP C_BRI_DN &enc_scroll>;
         };
 
         Num {
@@ -101,7 +101,7 @@
                       &trans        &trans        &trans        &trans       &kp PERIOD  &trans  &trans                         &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_BRI_UP C_BRI_DN &enc_scroll>;
+            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll>;
         };
 
         Function {
