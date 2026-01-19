@@ -1,4 +1,4 @@
-#define ZMK_POINTING_DEFAULT_SCRL_VAL 200
+#define ZMK_POINTING_DEFAULT_SCRL_VAL 230
 
 #include <behaviors.dtsi>
 #include <dt-bindings/zmk/bt.h>
@@ -60,9 +60,9 @@
         };
 
         enc_scroll: encoder_scroll {
-            compatible = "zmk,behavior-sensor-rotate";
-            #sensor-binding-cells = <0>;
-            bindings = <&msc SCRL_DOWN>, <&msc SCRL_UP>;
+            compatible = "zmk,behavior-sensor-rotate-var";
+            #sensor-binding-cells = <2>;
+            bindings = <&msc>, <&msc>;
 
             tap-ms = <20>;
         };
@@ -79,7 +79,7 @@
                        &mo 5  &kp LEFT_ALT  &mt LEFT_GUI LANG2  &mt LEFT_SHIFT SPACE  &esc_lang2_with_layer 3 0  &lt 2 ENTER  &lt 1 LANG1                      &kp BACKSPACE
             >;
 
-            sensor-bindings = <&enc_scroll &enc_scroll>;
+            sensor-bindings = <&enc_scroll SCRL_UP SCRL_DOWN   &enc_scroll SCRL_DOWN SCRL_UP>;
         };
 
         Symbol {
@@ -90,7 +90,7 @@
                          &trans         &trans            &trans       &trans                &trans  &trans  &trans                                              &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_BRI_UP C_BRI_DN &enc_scroll>;
+            sensor-bindings = <&inc_dec_kp C_BRI_UP C_BRI_DN &enc_scroll SCRL_DOWN SCRL_UP>;
         };
 
         Num {
@@ -101,7 +101,7 @@
                       &trans        &trans        &trans        &trans       &kp PERIOD  &trans  &trans                         &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll>;
+            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll SCRL_DOWN SCRL_UP>;
         };
 
         Function {
@@ -112,7 +112,7 @@
                                           &trans  &trans  &trans  &trans             &trans  &trans  &trans                                   &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll>;
+            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll SCRL_DOWN SCRL_UP>;
         };
 
         Mouse {
@@ -123,7 +123,7 @@
                 &trans  &trans  &trans  &trans  &trans  &kp RG(RS(LEFT_BRACKET))  &kp RG(RS(RIGHT_BRACKET))                           &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll>;
+            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll SCRL_DOWN SCRL_UP>;
         };
 
         Scroll {
@@ -134,7 +134,7 @@
                 &trans                    &trans                    &trans                    &trans                    &trans  &kp LC(TAB)  &kp LC(LS(TAB))                  &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll>;
+            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll SCRL_DOWN SCRL_UP>;
         };
 
         Device {
@@ -145,7 +145,7 @@
                 &trans  &trans  &trans  &trans  &trans  &trans  &trans                                    &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll>;
+            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll SCRL_DOWN SCRL_UP>;
         };
     };
 };

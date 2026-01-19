@@ -36,7 +36,7 @@ docker-compose run --rm zmk bash -c "
   echo '=================================='
   echo 'Building: dax3_R'
   echo '=================================='
-  west build -s zmk/app -b xiao_ble -d build/dax3_R -- \
+  west build -s zmk/app -b seeeduino_xiao_ble -d build/dax3_R -- \
     -DBOARD_ROOT=/workspace \
     -DSHIELD='dax3_R;rgbled_adapter' \
     -DSNIPPET=studio-rpc-usb-uart \
@@ -52,7 +52,7 @@ docker-compose run --rm zmk bash -c "
   echo '=================================='
   echo 'Building: dax3_L'
   echo '=================================='
-  west build -s zmk/app -b xiao_ble -d build/dax3_L -- \
+  west build -s zmk/app -b seeeduino_xiao_ble -d build/dax3_L -- \
     -DBOARD_ROOT=/workspace \
     -DSHIELD='dax3_L;rgbled_adapter' \
     -DZMK_CONFIG=/workspace/config \
@@ -67,7 +67,7 @@ docker-compose run --rm zmk bash -c "
   echo '=================================='
   echo 'Building: settings_reset'
   echo '=================================='
-  west build -s zmk/app -b xiao_ble -d build/settings_reset -- \
+  west build -s zmk/app -b seeeduino_xiao_ble -d build/settings_reset -- \
     -DBOARD_ROOT=/workspace \
     -DSHIELD=settings_reset \
     -DZMK_CONFIG=/workspace/config \
