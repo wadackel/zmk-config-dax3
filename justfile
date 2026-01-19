@@ -6,8 +6,12 @@ default:
 setup:
     @bash scripts/setup.sh
 
-# Build all targets in parallel (default, ~70% faster than baseline)
+# Build all targets with optimizations (1 container + ccache + auto parallel level)
 build:
+    @bash scripts/build-optimized.sh
+
+# Build all targets in parallel using 3 containers (legacy method)
+build-parallel:
     @bash scripts/build.sh
 
 # Build all targets sequentially (useful for debugging build errors)
@@ -44,3 +48,13 @@ pristine:
     @docker-compose run --rm zmk bash -c "west forall -c 'git clean -fdx' || true"
     @rm -rf build/ .west/ modules/ zephyr/ zmk/ bootloader/
     @echo "Complete cleanup done. Run 'just setup' to reinitialize."
+
+# Display ccache statistics
+ccache-stats:
+    @docker-compose run --rm zmk ccache -s
+
+# Clear ccache (useful for troubleshooting)
+ccache-clear:
+    @echo "Clearing ccache..."
+    @docker-compose run --rm zmk ccache -C
+    @echo "ccache cleared"
