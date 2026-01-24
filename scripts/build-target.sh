@@ -1,9 +1,33 @@
 #!/bin/bash
 set -e
 
+# Nix環境チェック
+if [ -z "$IN_NIX_SHELL" ]; then
+  echo "ERROR: Must run inside nix develop environment"
+  echo "Run: nix develop"
+  exit 1
+fi
+
+if [ -z "$ZEPHYR_SDK_INSTALL_DIR" ]; then
+  echo "ERROR: ZEPHYR_SDK_INSTALL_DIR is not set"
+  echo "Please check your Nix environment configuration"
+  exit 1
+fi
+
 TARGET="${1:-dax3_R}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
+
+# west workspace初期化チェック
+if [ ! -f .west/config ]; then
+  echo "ERROR: West workspace not initialized"
+  echo "Run: just setup"
+  exit 1
+fi
+
+CPU_COUNT=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo '4')
+PARALLEL_LEVEL=$((CPU_COUNT - 1))
+PARALLEL_LEVEL=$((PARALLEL_LEVEL < 2 ? 2 : PARALLEL_LEVEL))
 
 case "$TARGET" in
   dax3_R)
@@ -26,37 +50,25 @@ case "$TARGET" in
 esac
 
 echo "Building: $TARGET"
+echo "Parallel: $PARALLEL_LEVEL"
 
-docker-compose run --rm zmk bash -c "
-  set -e
+west build -s zmk/app -b xiao_ble -d "build/$TARGET" -- \
+  -DBOARD_ROOT="$PROJECT_ROOT" \
+  -DSHIELD="$SHIELD" \
+  ${SNIPPET:+-DSNIPPET="$SNIPPET"} \
+  -DZMK_CONFIG="$PROJECT_ROOT/config" \
+  -DCMAKE_BUILD_PARALLEL_LEVEL=$PARALLEL_LEVEL \
+  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
-  # Set Zephyr environment variables
-  export ZEPHYR_BASE=/workspace/zephyr
-  export ZEPHYR_TOOLCHAIN_VARIANT=zephyr
-  export ZEPHYR_SDK_INSTALL_DIR=/opt/zephyr-sdk-0.16.9
-
-  SNIPPET_FLAG=''
-  if [ -n '$SNIPPET' ]; then
-    SNIPPET_FLAG='-DSNIPPET=$SNIPPET'
-  fi
-
-  west build -s zmk/app -b seeeduino_xiao_ble -d build/$TARGET -- \
-    -DBOARD_ROOT=/workspace \
-    -DSHIELD='$SHIELD' \
-    \$SNIPPET_FLAG \
-    -DZMK_CONFIG=/workspace/config \
-    -DCMAKE_PREFIX_PATH='/workspace/zephyr/share/zephyr-package/cmake;/opt/zephyr-sdk-0.16.9/cmake'
-
-  # Copy UF2 to build root for easier access
-  if [ -f build/$TARGET/zephyr/zmk.uf2 ]; then
-    cp build/$TARGET/zephyr/zmk.uf2 build/$TARGET.uf2
-    echo ''
-    echo 'Build complete!'
-    echo '  build/$TARGET/zephyr/zmk.uf2'
-    echo '  build/$TARGET.uf2'
-  else
-    echo ''
-    echo 'Build failed: UF2 file not found'
-    exit 1
-  fi
-"
+if [ -f "build/$TARGET/zephyr/zmk.uf2" ]; then
+  cp "build/$TARGET/zephyr/zmk.uf2" "build/$TARGET.uf2"
+  echo ""
+  echo "Build complete!"
+  echo "  build/$TARGET/zephyr/zmk.uf2"
+  echo "  build/$TARGET.uf2"
+else
+  echo ""
+  echo "Build failed: UF2 file not found"
+  exit 1
+fi
