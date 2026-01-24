@@ -6,17 +6,9 @@ default:
 setup:
     @bash scripts/setup.sh
 
-# Build all targets with optimizations (1 container + ccache + auto parallel level)
+# Build all targets with Nix environment
 build:
     @bash scripts/build-optimized.sh
-
-# Build all targets in parallel using 3 containers (legacy method)
-build-parallel:
-    @bash scripts/build.sh
-
-# Build all targets sequentially (useful for debugging build errors)
-build-sequential:
-    @bash scripts/build-sequential.sh
 
 # Build specific target (e.g., just build-target dax3_R)
 build-target TARGET="dax3_R":
@@ -45,16 +37,5 @@ clean:
 # Complete cleanup including west workspace (for recovery from broken states)
 pristine:
     @echo "Performing complete cleanup..."
-    @docker-compose run --rm zmk bash -c "west forall -c 'git clean -fdx' || true"
-    @rm -rf build/ .west/ modules/ zephyr/ zmk/ bootloader/
+    @rm -rf build/ .west/ modules/ zephyr/ zmk/ bootloader/ .ccache/
     @echo "Complete cleanup done. Run 'just setup' to reinitialize."
-
-# Display ccache statistics
-ccache-stats:
-    @docker-compose run --rm zmk ccache -s
-
-# Clear ccache (useful for troubleshooting)
-ccache-clear:
-    @echo "Clearing ccache..."
-    @docker-compose run --rm zmk ccache -C
-    @echo "ccache cleared"

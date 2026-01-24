@@ -13,3 +13,8 @@ bootloader/
 *.hex
 *.elf
 /.ccache/
+
+# Nix
+.direnv/
+result
+result-*
