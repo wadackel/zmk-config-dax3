@@ -15,6 +15,5 @@ bootloader/
 /.ccache/
 
 # Nix
-.direnv/
 result
 result-*

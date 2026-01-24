@@ -14,7 +14,6 @@ ZMK firmware configuration for DAX3 keyboard with local Nix-based build environm
 ### Required
 
 - [Nix](https://nixos.org/download.html) with flakes enabled
-- [direnv](https://direnv.net/) (recommended for automatic environment activation)
 
 ### Flakes Setup
 
@@ -33,13 +32,7 @@ git clone <your-repo-url>
 cd zmk-config-dax3
 ```
 
-### 2. Allow direnv (if using direnv)
-
-```bash
-direnv allow
-```
-
-Or manually enter Nix shell:
+### 2. Enter Nix Development Shell
 
 ```bash
 nix develop
@@ -64,7 +57,7 @@ Build artifacts will be in `build/`:
 
 ## Common Commands
 
-All commands should be run inside the Nix development environment.
+All commands should be run inside the Nix development environment (`nix develop`).
 
 ### Build Commands
 
@@ -101,7 +94,7 @@ just clean
 just setup
 
 # Check ccache statistics
-nix develop --command ccache -s
+ccache -s
 ```
 
 ## Apple Silicon Notes
@@ -110,17 +103,17 @@ The build environment is configured for native Apple Silicon (aarch64-darwin) bu
 
 ### Using Rosetta (if needed)
 
-Edit `.envrc` and uncomment the x86_64-darwin line:
+Use the `--system` flag to force x86_64 emulation:
 
 ```bash
-# use flake
-use flake . --system x86_64-darwin
+nix develop --system x86_64-darwin
 ```
 
-Then reload:
+Then run your build commands as normal:
 
 ```bash
-direnv allow
+just setup
+just build
 ```
 
 ## Project Structure
@@ -129,7 +122,6 @@ direnv allow
 .
 ├── flake.nix              # Nix development environment definition
 ├── flake.lock             # Locked dependency versions
-├── .envrc                 # direnv configuration
 ├── config/                # ZMK configuration files
 │   ├── west.yml          # West manifest
 │   └── dax3.keymap       # Keymap definition
@@ -161,21 +153,20 @@ Enter the Nix development shell:
 nix develop
 ```
 
-Or use direnv:
-
-```bash
-direnv allow
-cd .  # Trigger reload
-```
-
 ### Build fails with SDK errors on Apple Silicon
 
 Switch to x86_64 mode (Rosetta):
 
-1. Edit `.envrc`
-2. Comment out `use flake`
-3. Uncomment `use flake . --system x86_64-darwin`
-4. Run `direnv allow`
+```bash
+nix develop --system x86_64-darwin
+```
+
+Then run setup and build:
+
+```bash
+just setup
+just build
+```
 
 ### "pkg_resources" module not found
 

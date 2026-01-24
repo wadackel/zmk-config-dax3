@@ -7,7 +7,6 @@ echo "Setting up ZMK local build environment..."
 if [ -z "$IN_NIX_SHELL" ]; then
   echo "ERROR: Must run inside nix develop environment"
   echo "Run: nix develop"
-  echo "Or with direnv: direnv allow && cd ."
   exit 1
 fi
 
