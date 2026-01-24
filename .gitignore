@@ -13,3 +13,7 @@ bootloader/
 *.hex
 *.elf
 /.ccache/
+
+# Nix
+result
+result-*

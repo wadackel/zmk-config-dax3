@@ -3,22 +3,26 @@ set -e
 
 echo "Setting up ZMK local build environment..."
 
-docker-compose run --rm zmk bash -c "
-  set -e
+# Nix環境チェック
+if [ -z "$IN_NIX_SHELL" ]; then
+  echo "ERROR: Must run inside nix develop environment"
+  echo "Run: nix develop"
+  exit 1
+fi
 
-  # Initialize west workspace (skip if already initialized)
-  if [ ! -f .west/config ]; then
-    echo 'Initializing west workspace...'
-    west init -l config/
-  fi
+# プロジェクトルート検出
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJECT_ROOT"
 
-  # Fetch external modules
-  echo 'Fetching external modules...'
-  west update
+if [ ! -f .west/config ]; then
+  echo 'Initializing west workspace...'
+  west init -l config/
+fi
 
-  # Install Python packages
-  echo 'Installing Python packages...'
-  west zephyr-export
+echo 'Fetching external modules...'
+west update
 
-  echo 'Setup complete!'
-"
+echo 'Installing Python packages...'
+west zephyr-export
+
+echo 'Setup complete!'
