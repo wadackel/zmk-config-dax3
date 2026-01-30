@@ -68,20 +68,6 @@ just build
 # Build specific target
 just build-target dax3_R
 just build-target dax3_L
-
-# Quick iteration: Build and flash right hand
-just quick
-
-# Quick iteration: Build and flash left hand
-just quick-left
-```
-
-### Flash Firmware
-
-```bash
-# Flash specific target (requires device in bootloader mode)
-just flash dax3_R
-just flash dax3_L
 ```
 
 ### Maintenance
@@ -130,8 +116,7 @@ just build
 ├── scripts/               # Build and utility scripts
 │   ├── setup.sh          # Workspace initialization
 │   ├── build-optimized.sh # Main build script
-│   ├── build-nix.sh      # Nix-specific build logic
-│   └── flash.sh          # Firmware flashing utility
+│   └── build-nix.sh      # Nix-specific build logic
 └── build/                 # Build output (git-ignored)
 ```
 

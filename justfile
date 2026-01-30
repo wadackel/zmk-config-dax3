@@ -14,20 +14,6 @@ build:
 build-target TARGET="dax3_R":
     @bash scripts/build-target.sh {{TARGET}}
 
-# Flash firmware to device (e.g., just flash dax3_R)
-flash TARGET="dax3_R":
-    @bash scripts/flash.sh {{TARGET}}
-
-# Quick iteration: Build and flash right hand (dax3_R)
-quick:
-    @bash scripts/build-target.sh dax3_R
-    @bash scripts/flash.sh dax3_R
-
-# Quick iteration: Build and flash left hand (dax3_L)
-quick-left:
-    @bash scripts/build-target.sh dax3_L
-    @bash scripts/flash.sh dax3_L
-
 # Clean build artifacts
 clean:
     @echo "Cleaning build artifacts..."
