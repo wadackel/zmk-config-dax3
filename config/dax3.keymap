@@ -90,7 +90,9 @@
                          &trans         &trans            &trans       &trans         &trans  &trans  &trans                                              &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_BRI_UP C_BRI_DN &enc_scroll SCRL_DOWN SCRL_UP>;
+            sensor-bindings =
+                <&enc_scroll SCRL_DOWN SCRL_UP>,
+                <&enc_scroll SCRL_DOWN SCRL_UP>;
         };
 
         Num {
@@ -101,7 +103,9 @@
                       &trans        &trans        &trans        &trans       &kp PERIOD  &trans  &trans                         &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll SCRL_DOWN SCRL_UP>;
+            sensor-bindings =
+                <&inc_dec_kp C_VOL_DN C_VOL_UP>,
+                <&inc_dec_kp C_BRI_INC C_BRI_DEC>;
         };
 
         Function {
@@ -112,7 +116,9 @@
                                           &trans  &trans  &trans  &trans             &trans  &trans  &trans                                   &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll SCRL_DOWN SCRL_UP>;
+            sensor-bindings =
+                <&inc_dec_kp C_VOL_DN C_VOL_UP>,
+                <&inc_dec_kp C_BRI_INC C_BRI_DEC>;
         };
 
         Mouse {
@@ -123,7 +129,9 @@
                 &trans  &trans  &trans  &trans  &trans  &kp RG(RS(LEFT_BRACKET))  &kp RG(RS(RIGHT_BRACKET))                           &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll SCRL_DOWN SCRL_UP>;
+            sensor-bindings =
+                <&enc_scroll SCRL_DOWN SCRL_DOWN>,
+                <&enc_scroll SCRL_DOWN SCRL_UP>;
         };
 
         Scroll {
@@ -134,7 +142,9 @@
                 &trans                    &trans                    &trans                    &trans                    &trans  &kp LC(TAB)  &kp LC(LS(TAB))                  &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll SCRL_DOWN SCRL_UP>;
+            sensor-bindings =
+                <&enc_scroll SCRL_DOWN SCRL_UP>,
+                <&enc_scroll SCRL_DOWN SCRL_UP>;
         };
 
         Device {
@@ -145,7 +155,9 @@
                 &trans  &trans  &trans  &trans  &trans  &trans  &trans                                    &trans
             >;
 
-            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &enc_scroll SCRL_DOWN SCRL_UP>;
+            sensor-bindings =
+                <&enc_scroll SCRL_DOWN SCRL_UP>,
+                <&enc_scroll SCRL_DOWN SCRL_UP>;
         };
     };
 };
