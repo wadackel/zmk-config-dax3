@@ -51,6 +51,7 @@ build_target() {
     -DSHIELD="$shield" \
     ${snippet:+-DSNIPPET="$snippet"} \
     -DZMK_CONFIG="$PROJECT_ROOT/config" \
+    -DZMK_EXTRA_MODULES="$PROJECT_ROOT" \
     -DCMAKE_BUILD_PARALLEL_LEVEL=$PARALLEL_LEVEL \
     -DCMAKE_C_COMPILER_LAUNCHER=ccache \
     -DCMAKE_CXX_COMPILER_LAUNCHER=ccache

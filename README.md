@@ -83,6 +83,17 @@ just setup
 ccache -s
 ```
 
+### Non-Interactive Execution
+
+You can run any command without entering an interactive shell:
+
+```bash
+nix develop --command just build
+nix develop --command just build-target dax3_R
+```
+
+This is useful for CI scripts or automated tools.
+
 ## Apple Silicon Notes
 
 The build environment is configured for native Apple Silicon (aarch64-darwin) builds. If you encounter SDK-related errors, you can run using Rosetta translation:
