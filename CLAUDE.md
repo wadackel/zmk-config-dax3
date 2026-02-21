@@ -207,6 +207,13 @@ ZMK を v0.3 から main に移行する際は、ボード名も `xiao_ble//zmk`
 
 BLE profile マッピング: 0-2 = macOS（overlay なし）、3 = Android（Layer 7）、4 = Windows（Layer 8）
 
+## テスター (tools/tester)
+
+### GitHub Pages デプロイ
+- main ブランチへのプッシュで自動デプロイ（`.github/workflows/deploy-tester.yml`）
+- URL: `https://wadackel.github.io/zmk-config-dax3/`
+- pnpm バージョンは `tools/tester/package.json` の `packageManager` フィールドから取得
+
 ## 参考ドキュメント
 
 - [詳細な学び](./docs/encoder-tuning-learnings.md) - 試行錯誤の過程と深い理解
