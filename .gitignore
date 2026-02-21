@@ -17,3 +17,6 @@ bootloader/
 # Nix
 result
 result-*
+
+# Tester
+tools/tester/node_modules/
