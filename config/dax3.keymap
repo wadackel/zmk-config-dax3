@@ -67,8 +67,6 @@
             compatible = "zmk,behavior-macro";
             #binding-cells = <0>;
             bindings = <&macro_tap>, <&kp ESCAPE &kp LANG2>;
-
-            label = "ESC_LANG2";
         };
 
     };
@@ -76,7 +74,6 @@
     behaviors {
         esc_lang2_with_layer: esc_lang2_with_layer {
             compatible = "zmk,behavior-hold-tap";
-            label = "ESC_LANG2_WITH_LAYER";
             bindings = <&mo>, <&esc_lang2>;
 
             #binding-cells = <2>;
