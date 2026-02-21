@@ -46,7 +46,7 @@ build_target() {
 
   echo "Building: $target"
 
-  west build -s zmk/app -b seeeduino_xiao_ble -d "build/$target" -- \
+  west build -s zmk/app -b "xiao_ble//zmk" -d "build/$target" -- \
     -DBOARD_ROOT="$PROJECT_ROOT" \
     -DSHIELD="$shield" \
     ${snippet:+-DSNIPPET="$snippet"} \
