@@ -26,6 +26,32 @@ nix develop --command just clean
 
 ## ハードウェア仕様
 
+### PMW3610 トラックボール
+
+#### scroll-layers の挙動（重要）
+
+PMW3610 ドライバは `zmk_keymap_highest_layer_active()` で `scroll-layers` を判定する。
+Scroll(5) + Android(7) が同時 active な場合、最高レイヤーは 7 → Layer 5 は判定されない。
+
+**解決策**: `conditional_layers` で専用レイヤーを作り `scroll-layers` に追加する:
+
+```dts
+// scroll-layers = <5 10 11>;  // 5=Scroll, 10=ScrollAndroid, 11=ScrollWindows
+```
+
+#### per-layer スクロール方向の反転
+
+`input-listener` に per-layer override で実現する。`transform.dtsi` のインクルードが**必須**（auto-include されない）:
+
+```dts
+#include <input/processors/transform.dtsi>
+
+non_macos_scroll_override {
+  layers = <7 8>;
+  input-processors = <&zip_scroll_transform (INPUT_TRANSFORM_X_INVERT | INPUT_TRANSFORM_Y_INVERT)>;
+};
+```
+
 ### ロータリーエンコーダ
 - **型番**: EC11
 - **steps**: 80 (1回転あたりのパルス数)
@@ -119,6 +145,25 @@ enc_scroll: encoder_scroll {
 
 ## トラブルシューティング
 
+### CI が `led_red alias not found` で失敗する
+
+`zmk-rgbled-widget` の `revision: main` が更新され ZMK v0.3 互換性が壊れた可能性。
+`config/west.yml` のリビジョンを ZMK v0.3 互換の commit hash にピン留めすること。
+
+### zmk-rgbled-widget の互換性
+
+ZMK v0.3 は `seeeduino_xiao_ble` ボード名を使用する。`zmk-rgbled-widget` は
+2026-02-16 に ZMK main 用の `xiao_ble_zmk` に移行し、v0.3 互換性を削除した。
+`revision: main` で CI が壊れるため、`config/west.yml` でピン留めする:
+
+```yaml
+- name: zmk-rgbled-widget
+  remote: caksoylar
+  revision: a3510c9d  # Last version compatible with ZMK v0.3 (seeeduino_xiao_ble)
+```
+
+ZMK を v0.3 から main に移行する際は、ボード名も `xiao_ble//zmk` に変更が必要。
+
 ### スクロールが一切反応しない
 
 **チェック項目:**
@@ -140,6 +185,27 @@ enc_scroll: encoder_scroll {
 **原因:**
 - `tap-ms`が長すぎる（100msなど）
 - → 20msに設定
+
+## 現在のレイヤー構成
+
+| 番号 | 名前 | 説明 |
+|------|------|------|
+| 0 | default_layer | デフォルト（macOS） |
+| 1 | Symbol | 記号 |
+| 2 | Num | 数字 |
+| 3 | Function | ファンクション・矢印 |
+| 4 | Mouse | マウスボタン |
+| 5 | Scroll | スクロールモード |
+| 6 | Device | BLE設定 |
+| 7 | Android | Androidオーバーレイ（BLE profile 3） |
+| 8 | Windows | Windowsオーバーレイ（BLE profile 4） |
+| 9 | EmacsNav | Emacs風ナビゲーション |
+| 10 | ScrollAndroid | if-layers=\<5 7\> の conditional |
+| 11 | ScrollWindows | if-layers=\<5 8\> の conditional |
+| 12 | FuncAndroid | if-layers=\<3 7\> の conditional |
+| 13 | MouseAndroid | if-layers=\<4 7\> の conditional |
+
+BLE profile マッピング: 0-2 = macOS（overlay なし）、3 = Android（Layer 7）、4 = Windows（Layer 8）
 
 ## 参考ドキュメント
 
