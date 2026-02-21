@@ -1,5 +1,29 @@
 # dax3 ZMK設定開発ガイド
 
+## ビルド手順
+
+ビルドコマンドは `nix develop --command` 経由で実行する。対話型シェルに入る必要はない。
+
+```bash
+# 初回セットアップ（westワークスペース初期化）
+nix develop --command just setup
+
+# 全ターゲットビルド
+nix develop --command just build
+
+# 特定ターゲットのみビルド
+nix develop --command just build-target dax3_R
+nix develop --command just build-target dax3_L
+
+# ビルド成果物の削除
+nix develop --command just clean
+```
+
+ビルド成果物は `build/` に出力される:
+- `build/dax3_R.uf2` - 右手側（トラックボール + ZMK Studio）
+- `build/dax3_L.uf2` - 左手側
+- `build/settings_reset.uf2` - 設定リセット用
+
 ## ハードウェア仕様
 
 ### ロータリーエンコーダ
