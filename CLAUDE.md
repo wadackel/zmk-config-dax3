@@ -212,7 +212,8 @@ BLE profile マッピング: 0-2 = macOS（overlay なし）、3 = Android（Lay
 ### GitHub Pages デプロイ
 - main ブランチへのプッシュで自動デプロイ（`.github/workflows/deploy-tester.yml`）
 - URL: `https://wadackel.github.io/zmk-config-dax3/`
-- pnpm バージョンは `tools/tester/package.json` の `packageManager` フィールドから取得
+- node/pnpm バージョンは `.mise.toml` で管理（source of truth）
+- `tools/tester/package.json` の `packageManager` は corepack 互換のため同期して更新すること
 
 ## 参考ドキュメント
 
