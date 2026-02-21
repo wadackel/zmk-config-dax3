@@ -20,3 +20,4 @@ result-*
 
 # Tester
 tools/tester/node_modules/
+tools/tester/dist/

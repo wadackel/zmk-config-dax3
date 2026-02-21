@@ -18,6 +18,9 @@ importers:
       '@hono/vite-dev-server':
         specifier: ^0.18
         version: 0.18.3(hono@4.12.0)
+      '@hono/vite-ssg':
+        specifier: ^0.3.3
+        version: 0.3.3(hono@4.12.0)
       '@tailwindcss/vite':
         specifier: ^4
         version: 4.2.0(vite@6.4.1(jiti@2.6.1)(lightningcss@1.31.1))
@@ -266,6 +269,12 @@ packages:
         optional: true
       wrangler:
         optional: true
+
+  '@hono/vite-ssg@0.3.3':
+    resolution: {integrity: sha512-i8mIZhgW1S/xpNLcLHDFvAiwRkLQolJlQWTwNMWZcGnSkc8/Mq+TCWv4NDRWmDayNGWlOqbjIUwk8w5wp/eHTg==}
+    engines: {node: '>=18.14.1'}
+    peerDependencies:
+      hono: '>=4.8.0'
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -1096,6 +1105,10 @@ snapshots:
       '@hono/node-server': 1.19.9(hono@4.12.0)
       hono: 4.12.0
       minimatch: 9.0.5
+
+  '@hono/vite-ssg@0.3.3(hono@4.12.0)':
+    dependencies:
+      hono: 4.12.0
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
