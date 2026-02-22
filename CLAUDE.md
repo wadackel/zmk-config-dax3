@@ -26,6 +26,12 @@ nix develop --command just clean
 
 ## ハードウェア仕様
 
+### Split キーボードアーキテクチャ
+
+- `dax3_R`（右手）が **central**。キーマップ・レイヤー管理・トラックボールを担当
+- `dax3_L`（左手）が **peripheral**。エンコーダ入力のみ、レイヤー関連の設定は不要
+- `CONFIG_ZMK_OS_LAYER` など keymap に関わる設定は `dax3_R.conf` のみに記述する
+
 ### PMW3610 トラックボール
 
 #### scroll-layers の挙動（重要）
@@ -144,6 +150,12 @@ enc_scroll: encoder_scroll {
 ```
 
 ## トラブルシューティング
+
+### ZMK で OS を自動検出できるか？
+
+**できない。** ZMK v0.3 に OS 自動検出機能は存在しない。USB HID descriptor 分析（QMK の `os_detection`）も
+BLE GATT 経由の OS 識別も未実装。BLE profile ベースのマッピングが唯一の手段。
+`app/src/os_layer.c` が `CONFIG_ZMK_OS_LAYER_PROFILE_N` Kconfig で profile→layer を定義している。
 
 ### CI が `led_red alias not found` で失敗する
 

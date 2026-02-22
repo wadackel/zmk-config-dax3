@@ -7,16 +7,20 @@
 
 LOG_MODULE_REGISTER(os_layer, CONFIG_LOG_DEFAULT_LEVEL);
 
-#define ANDROID_LAYER 7
-#define WINDOWS_LAYER 8
+#define PROFILE_COUNT 5
 
-#define OS_LAYER_COUNT 2
-static const uint8_t os_layers[OS_LAYER_COUNT] = {ANDROID_LAYER, WINDOWS_LAYER};
+static const int8_t profile_layers[PROFILE_COUNT] = {
+    CONFIG_ZMK_OS_LAYER_PROFILE_0,
+    CONFIG_ZMK_OS_LAYER_PROFILE_1,
+    CONFIG_ZMK_OS_LAYER_PROFILE_2,
+    CONFIG_ZMK_OS_LAYER_PROFILE_3,
+    CONFIG_ZMK_OS_LAYER_PROFILE_4,
+};
 
 static void deactivate_all_os_layers(void) {
-    for (int i = 0; i < OS_LAYER_COUNT; i++) {
-        if (zmk_keymap_layer_active(os_layers[i])) {
-            zmk_keymap_layer_deactivate(os_layers[i]);
+    for (int i = 0; i < PROFILE_COUNT; i++) {
+        if (profile_layers[i] >= 0 && zmk_keymap_layer_active(profile_layers[i])) {
+            zmk_keymap_layer_deactivate(profile_layers[i]);
         }
     }
 }
@@ -24,18 +28,8 @@ static void deactivate_all_os_layers(void) {
 static void update_os_layer(uint8_t profile_index) {
     deactivate_all_os_layers();
 
-    switch (profile_index) {
-    case 0:
-    case 1:
-    case 2:
-        // macOS - no overlay
-        break;
-    case 3:
-        zmk_keymap_layer_activate(ANDROID_LAYER);
-        break;
-    case 4:
-        zmk_keymap_layer_activate(WINDOWS_LAYER);
-        break;
+    if (profile_index < PROFILE_COUNT && profile_layers[profile_index] >= 0) {
+        zmk_keymap_layer_activate(profile_layers[profile_index]);
     }
 }
 
