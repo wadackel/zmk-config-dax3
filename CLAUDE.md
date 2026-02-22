@@ -17,12 +17,24 @@ nix develop --command just build-target dax3_L
 
 # ビルド成果物の削除
 nix develop --command just clean
+
+# 完全クリーンアップ（.west/, modules/ 等を含むワークスペース再構築用）
+nix develop --command just pristine
 ```
 
 ビルド成果物は `build/` に出力される:
 - `build/dax3_R.uf2` - 右手側（トラックボール + ZMK Studio）
 - `build/dax3_L.uf2` - 左手側
 - `build/settings_reset.uf2` - 設定リセット用
+
+## ディレクトリ構造
+
+- `app/` - カスタム ZMK モジュール（os_layer.c, Kconfig）
+- `boards/shields/dax3/` - Shield定義（dtsi, overlay, conf, Kconfig）
+- `config/` - キーマップ（`dax3.keymap`）、`west.yml`、ZMK Studio用 JSON
+- `scripts/` - justfile から呼ばれるビルドスクリプト
+- `tools/tester/` - キーマップテスターWebアプリ（Vite + HonoX）
+- `docs/` - 詳細な学びのドキュメント
 
 ## ハードウェア仕様
 
@@ -70,6 +82,7 @@ non_macos_scroll_override {
 #### 1. `tap-ms`は16ms以上必須
 
 ```c
+// config/dax3.keymap
 enc_scroll: encoder_scroll {
   tap-ms = <20>;  // ✅ OK: 16ms以上
   // tap-ms = <10>;  // ❌ NG: スクロールが一切動かなくなる
@@ -89,6 +102,7 @@ enc_scroll: encoder_scroll {
 ### 2. `triggers-per-rotation`はデテント数に合わせる
 
 ```dts
+// boards/shields/dax3/dax3.dtsi
 sensors: sensors {
   triggers-per-rotation = <24>;  // デテント数に合わせる
 };
@@ -106,6 +120,7 @@ sensors: sensors {
 ### 3. スクロール速度は`SCRL_VAL`で調整
 
 ```c
+// config/dax3.keymap
 #define ZMK_POINTING_DEFAULT_SCRL_VAL 120
 ```
 
@@ -118,36 +133,10 @@ sensors: sensors {
 - 60だと小さすぎてmacOSが認識しない
 - 120以上が安全圏
 
-## パラメータの役割分担
+**調整目安:**
+- 速い→140-160、遅い→80-100
 
-| パラメータ | 役割 | 調整方法 |
-|----------|------|---------|
-| `triggers-per-rotation` | **いつ発火するか**（反応性） | デテント数に合わせる（24） |
-| `SCRL_VAL` | **どれだけスクロールするか**（速度） | 速い→140-160、遅い→80-100 |
-| `tap-ms` | **バースト防止** | 16ms以上、基本は20ms |
-
-## 現在の設定（動作確認済み）
-
-```dts
-// boards/shields/dax3/dax3.dtsi
-sensors: sensors {
-  compatible = "zmk,keymap-sensors";
-  sensors = <&left_encoder &right_encoder>;
-  triggers-per-rotation = <24>;  // デテント数に合わせる
-};
-```
-
-```c
-// config/dax3.keymap
-#define ZMK_POINTING_DEFAULT_SCRL_VAL 120  // 適度な速度
-
-enc_scroll: encoder_scroll {
-  compatible = "zmk,behavior-sensor-rotate-var";
-  #sensor-binding-cells = <2>;
-  bindings = <&msc>, <&msc>;
-  tap-ms = <20>;  // 16ms以上必須
-};
-```
+完全な動作設定は `config/dax3.keymap` と `boards/shields/dax3/dax3.dtsi` を参照。
 
 ## トラブルシューティング
 
@@ -219,10 +208,15 @@ ZMK を v0.3 から main に移行する際は、ボード名も `xiao_ble//zmk`
 
 BLE profile マッピング: 0-2 = macOS（overlay なし）、3 = Android（Layer 7）、4 = Windows（Layer 8）
 
-## テスター (tools/tester)
+## CI / デプロイ
 
-### GitHub Pages デプロイ
-- main ブランチへのプッシュで自動デプロイ（`.github/workflows/deploy-tester.yml`）
+### ファームウェアビルド
+- `.github/workflows/build.yml` - push/PR/手動トリガーで実行
+- ZMK の reusable workflow（`zmkfirmware/zmk/.github/workflows/build-user-config.yml@v0.3.0`）を使用
+- ビルド対象は `build.yaml` で定義（`build.yml` と混同しないこと）
+
+### テスター (tools/tester)
+- `.github/workflows/deploy-tester.yml` - main ブランチへのプッシュで自動デプロイ（手動トリガーも可）
 - URL: `https://wadackel.github.io/zmk-config-dax3/`
 - node/pnpm バージョンは `.mise.toml` で管理（source of truth）
 - `tools/tester/package.json` の `packageManager` は corepack 互換のため同期して更新すること
