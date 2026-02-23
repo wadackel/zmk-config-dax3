@@ -68,7 +68,6 @@
             #binding-cells = <0>;
             bindings = <&macro_tap>, <&kp ESCAPE &kp LANG2>;
         };
-
     };
 
     behaviors {
@@ -76,6 +75,7 @@
         // - hold-preferred: resolves hold on other key press (not release), like Karabiner's lazy:true
         // - retro-tap: sends tap (LANG2) on release if no other key was pressed, like Karabiner's to_if_alone
         // - tapping-term-ms 100: matches Karabiner's to_if_held_down_threshold_milliseconds
+
         kht: karabiner_hold_tap {
             compatible = "zmk,behavior-hold-tap";
             #binding-cells = <2>;
@@ -109,10 +109,10 @@
 
         default_layer {
             bindings = <
-&kp TAB         &kp Q  &kp W  &kp E         &kp R               &kp T                                                         &kp Y        &kp U  &kp I        &kp O     &kp P            &kp MINUS
-&kp LCTRL       &kp A  &kp S  &kp D         &kp F               &kp G                                                         &kp H        &kp J  &kp K        &kp L     &lt 4 SEMICOLON  &kp SINGLE_QUOTE
-&kp LEFT_SHIFT  &kp Z  &kp X  &kp C         &kp V               &kp B                 &bootloader                &bootloader  &kp N        &kp M  &lt 5 COMMA  &kp DOT   &kp SLASH        &mkp MB1
-                       &mo 5  &kp LEFT_ALT  &kht LEFT_GUI LANG2  &mt LEFT_SHIFT SPACE  &esc_lang2_with_layer 3 0  &lt 2 ENTER  &lt 1 LANG1                      &mkp MB2
+&kp TAB         &kp Q  &kp W  &kp E         &kp R                &kp T                                                         &kp Y        &kp U  &kp I        &kp O    &kp P            &kp MINUS
+&kp LCTRL       &kp A  &kp S  &kp D         &kp F                &kp G                                                         &kp H        &kp J  &kp K        &kp L    &lt 4 SEMICOLON  &kp SINGLE_QUOTE
+&kp LEFT_SHIFT  &kp Z  &kp X  &kp C         &kp V                &kp B                 &bootloader                &bootloader  &kp N        &kp M  &lt 5 COMMA  &kp DOT  &kp SLASH        &mkp MB1
+                       &mo 5  &kp LEFT_ALT  &kht LEFT_GUI LANG2  &mt LEFT_SHIFT SPACE  &esc_lang2_with_layer 3 0  &lt 2 ENTER  &lt 1 LANG1                      &mo 6
             >;
 
             sensor-bindings = <&enc_scroll SCRL_UP SCRL_DOWN   &enc_scroll SCRL_DOWN SCRL_UP>;
@@ -185,9 +185,9 @@
 
         Device {
             bindings = <
-&trans  &trans  &trans  &trans  &trans  &trans                  &trans        &trans        &trans        &trans        &bt BT_CLR  &bt BT_CLR_ALL
+&trans  &trans  &trans  &trans  &trans  &trans                  &trans        &trans        &trans        &trans        &bt BT_CLR    &bt BT_CLR_ALL
 &trans  &trans  &trans  &trans  &trans  &trans                  &bt BT_SEL 0  &bt BT_SEL 1  &bt BT_SEL 2  &bt BT_SEL 3  &bt BT_SEL 4  &trans
-&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans        &trans        &trans        &trans        &trans      &trans
+&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans        &trans        &trans        &trans        &trans        &trans
                 &trans  &trans  &trans  &trans  &trans  &trans  &trans                                    &trans
             >;
 
@@ -198,10 +198,10 @@
 
         Android {
             bindings = <
-&trans  &trans  &trans  &trans  &trans             &trans                                                             &trans  &trans  &trans  &trans  &trans  &trans
-&mo 9   &trans  &trans  &trans  &trans             &trans                                                             &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans             &trans                    &trans                   &trans          &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &kht LGUI LANG2  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans  &trans  &trans           &trans                  &trans  &trans  &trans  &trans  &trans  &trans
+&mo 9   &trans  &trans  &trans  &trans           &trans                  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans  &trans  &trans           &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+                &trans  &trans  &kht LGUI LANG2  &trans  &trans  &trans  &trans                  &trans
             >;
 
             sensor-bindings =
@@ -211,10 +211,10 @@
 
         Windows {
             bindings = <
-&trans  &trans  &trans  &trans  &trans          &trans                                                        &trans  &trans  &trans  &trans  &trans  &trans
-&mo 9   &trans  &trans  &trans  &trans          &trans                                                        &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans          &trans                &trans                   &trans         &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &kht LCTRL LANG2 &trans                &trans                   &trans         &trans                          &trans
+&trans  &trans  &trans  &trans  &trans            &trans                  &trans  &trans  &trans  &trans  &trans  &trans
+&mo 9   &trans  &trans  &trans  &trans            &trans                  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans  &trans  &trans            &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+                &trans  &trans  &kht LCTRL LANG2  &trans  &trans  &trans  &trans                  &trans
             >;
 
             sensor-bindings =
@@ -224,10 +224,10 @@
 
         EmacsNav {
             bindings = <
-&kp LC(TAB)  &kp LC(Q)  &kp LC(W)  &kp END    &kp LC(R)  &kp LC(T)                                             &kp LC(Y)  &kp LC(U)  &kp LC(I)  &kp LC(O)  &kp UP      &kp LC(MINUS)
-&trans       &kp HOME   &kp LC(S)  &kp DEL    &kp RIGHT  &kp LC(G)                                             &kp BSPC   &kp LC(J)  &kp LC(K)  &kp LC(L)  &trans      &trans
-&trans       &kp LC(Z)  &kp LC(X)  &kp LC(C)  &kp LC(V)  &kp LEFT              &trans           &trans         &kp DOWN   &kp LC(M)  &trans      &trans      &trans      &trans
-                        &trans     &trans     &trans     &trans                &trans           &trans         &trans                              &trans
+&kp LC(TAB)  &kp LC(Q)  &kp LC(W)  &kp END    &kp LC(R)  &kp LC(T)                  &kp LC(Y)  &kp LC(U)  &kp LC(I)  &kp LC(O)  &kp UP  &kp LC(MINUS)
+&trans       &kp HOME   &kp LC(S)  &kp DEL    &kp RIGHT  &kp LC(G)                  &kp BSPC   &kp LC(J)  &kp LC(K)  &kp LC(L)  &trans  &trans
+&trans       &kp LC(Z)  &kp LC(X)  &kp LC(C)  &kp LC(V)  &kp LEFT   &trans  &trans  &kp DOWN   &kp LC(M)  &trans     &trans     &trans  &trans
+                        &trans     &trans     &trans     &trans     &trans  &trans  &trans                           &trans
             >;
 
             sensor-bindings =
@@ -240,7 +240,7 @@
 &trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &trans  &trans  &trans
 &trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &trans  &trans  &trans
 &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &trans  &trans  &trans  &trans  &trans                          &trans
+                &trans  &trans  &trans  &trans  &trans  &trans  &trans                  &trans
             >;
         };
 
@@ -249,27 +249,26 @@
 &trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &trans  &trans  &trans
 &trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &trans  &trans  &trans
 &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &trans  &trans  &trans  &trans  &trans                          &trans
+                &trans  &trans  &trans  &trans  &trans  &trans  &trans                  &trans
             >;
         };
 
         FuncAndroid {
             bindings = <
-&trans  &trans  &trans  &trans  &trans  &kp LGUI                &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &trans  &trans  &trans  &trans  &trans                          &trans
+&trans  &trans  &trans  &trans  &trans  &kp LGUI                  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans  &trans  &trans  &trans                    &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans  &trans  &trans  &trans    &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+                &trans  &trans  &trans  &trans    &trans  &trans  &trans                  &trans
             >;
         };
 
         MouseAndroid {
             bindings = <
-&trans  &trans  &trans  &trans  &trans  &trans                  &trans          &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans                  &trans          &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans          &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &trans  &trans  &trans  &kp LG(LEFT)  &trans                            &trans
+&trans  &trans  &trans  &trans  &trans  &trans                        &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans  &trans  &trans  &trans                        &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans        &trans  &trans  &trans  &trans  &trans  &trans
+                &trans  &trans  &trans  &trans  &trans  &kp LG(LEFT)  &trans                  &trans
             >;
         };
-
     };
 };
