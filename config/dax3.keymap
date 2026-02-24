@@ -148,7 +148,7 @@
             bindings = <
 &kp LG(LS(N7))  &kp LG(LS(NUMBER_4))      &kp F7  &kp F8  &kp F9  &kp LG(SPACE)                      &kp C_MUTE  &kp C_PP  &kp C_VOLUME_DOWN  &kp C_VOLUME_UP  &trans  &trans
 &trans          &kp LG(LC(LS(NUMBER_4)))  &kp F4  &kp F5  &kp F6  &kp LG(LC(SPACE))                  &kp LEFT    &kp DOWN  &kp UP_ARROW       &kp RIGHT        &trans  &trans
-&trans          &kp F10                   &kp F1  &kp F2  &kp F3  &trans             &trans  &trans  &trans      &trans    &trans             &trans           &trans  &trans
+&trans          &kp F10                   &kp F1  &kp F2  &kp F3  &mo 6              &trans  &trans  &trans      &trans    &trans             &trans           &trans  &trans
                                           &trans  &trans  &trans  &trans             &trans  &trans  &trans                                   &trans
             >;
 
@@ -185,10 +185,10 @@
 
         Device {
             bindings = <
-&trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &trans        &bt BT_CLR    &bt BT_CLR_ALL
-&trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &bt BT_SEL 0  &bt BT_SEL 1  &bt BT_SEL 2
-&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &bt BT_SEL 3  &bt BT_SEL 4  &trans
-                &trans  &trans  &trans  &trans  &trans  &trans  &trans                  &trans
+&trans  &trans  &trans  &trans  &trans  &trans                  &trans        &trans        &trans        &trans        &bt BT_CLR    &bt BT_CLR_ALL
+&trans  &trans  &trans  &trans  &trans  &trans                  &bt BT_SEL 0  &bt BT_SEL 1  &bt BT_SEL 2  &bt BT_SEL 3  &bt BT_SEL 4  &trans
+&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans        &bt BT_PRV    &bt BT_NXT    &trans        &trans        &trans
+                &trans  &trans  &trans  &trans  &trans  &trans  &trans                                    &trans
             >;
 
             sensor-bindings =
