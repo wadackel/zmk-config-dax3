@@ -71,21 +71,6 @@
     };
 
     behaviors {
-        // Karabiner-Elements-like hold-tap for modifier + IME toggle on thumb keys.
-        // - hold-preferred: resolves hold on other key press (not release), like Karabiner's lazy:true
-        // - retro-tap: sends tap (LANG2) on release if no other key was pressed, like Karabiner's to_if_alone
-        // - tapping-term-ms 100: matches Karabiner's to_if_held_down_threshold_milliseconds
-
-        kht: karabiner_hold_tap {
-            compatible = "zmk,behavior-hold-tap";
-            #binding-cells = <2>;
-            flavor = "hold-preferred";
-            tapping-term-ms = <100>;
-            quick-tap-ms = <0>;
-            retro-tap;
-            bindings = <&kp>, <&kp>;
-        };
-
         esc_lang2_with_layer: esc_lang2_with_layer {
             compatible = "zmk,behavior-hold-tap";
             bindings = <&mo>, <&esc_lang2>;
@@ -112,7 +97,7 @@
 &kp TAB         &kp Q  &kp W  &kp E         &kp R                &kp T                                                         &kp Y        &kp U  &kp I        &kp O    &kp P            &kp MINUS
 &kp LCTRL       &kp A  &kp S  &kp D         &kp F                &kp G                                                         &kp H        &kp J  &kp K        &kp L    &lt 4 SEMICOLON  &kp SINGLE_QUOTE
 &kp LEFT_SHIFT  &kp Z  &kp X  &kp C         &kp V                &kp B                 &bootloader                &bootloader  &kp N        &kp M  &lt 5 COMMA  &kp DOT  &kp SLASH        &mkp MB1
-                       &mo 5  &kp LEFT_ALT  &kht LEFT_GUI LANG2  &mt LEFT_SHIFT SPACE  &esc_lang2_with_layer 3 0  &lt 2 ENTER  &lt 1 LANG1                      &mo 6
+                       &mo 5  &kp LEFT_ALT  &mt LEFT_GUI LANG2  &mt LEFT_SHIFT SPACE  &esc_lang2_with_layer 3 0  &lt 2 ENTER  &lt 1 LANG1                      &mo 6
             >;
 
             sensor-bindings = <&enc_scroll SCRL_UP SCRL_DOWN   &enc_scroll SCRL_DOWN SCRL_UP>;
@@ -201,7 +186,7 @@
 &trans  &trans  &trans  &trans  &trans           &trans                  &trans  &trans  &trans  &trans  &trans  &trans
 &mo 9   &trans  &trans  &trans  &trans           &trans                  &trans  &trans  &trans  &trans  &trans  &trans
 &trans  &trans  &trans  &trans  &trans           &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &kht LGUI LANG2  &trans  &trans  &trans  &trans                  &trans
+                &trans  &trans  &mt LGUI LANG2  &trans  &trans  &trans  &trans                  &trans
             >;
 
             sensor-bindings =
@@ -214,7 +199,7 @@
 &trans  &trans  &trans  &trans  &trans            &trans                  &trans  &trans  &trans  &trans  &trans  &trans
 &mo 9   &trans  &trans  &trans  &trans            &trans                  &trans  &trans  &trans  &trans  &trans  &trans
 &trans  &trans  &trans  &trans  &trans            &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &kht LCTRL LANG2  &trans  &trans  &trans  &trans                  &trans
+                &trans  &trans  &mt LCTRL LANG2  &trans  &trans  &trans  &trans                  &trans
             >;
 
             sensor-bindings =

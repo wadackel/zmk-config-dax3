@@ -75,29 +75,6 @@ non_macos_scroll_override {
 - **steps**: 80 (1回転あたりのパルス数)
 - **デテント数**: 24 (1回転あたりのクリック数)
 
-## hold-tap の Karabiner-Elements 互換設定
-
-Karabiner-Elements の `lazy: true` + `to_if_alone` に相当する ZMK パターン:
-
-- `flavor = "hold-preferred"`: 他キー press 時点で即座に hold 判定（`lazy:true` 相当、`balanced` は press+release を待つため遅い）
-- `retro-tap`: tapping-term 超過後でも他キーなしでリリースすれば tap 送信（`to_if_alone` 相当）
-- `tapping-term-ms = <100>`: Karabiner の `to_if_held_down_threshold_milliseconds: 100` に対応
-- **`hold-while-undecided` は LEFT_GUI には使わない**: macOS で modifier press→release が OS に送られランチャーが誤起動する恐れあり
-- `retro-tap` 有効時は tapping-term 超過後も modifier を OS に未送信で保留。外部マウスの物理クリックとの組み合わせ（Cmd+Click 等）は不可。`&mkp` キー経由なら問題なし
-
-```dts
-kht: karabiner_hold_tap {
-    compatible = "zmk,behavior-hold-tap";
-    #binding-cells = <2>;
-    flavor = "hold-preferred";
-    tapping-term-ms = <100>;
-    quick-tap-ms = <0>;
-    retro-tap;
-    bindings = <&kp>, <&kp>;
-};
-// Usage: &kht LEFT_GUI LANG2
-```
-
 ## ZMKロータリーエンコーダ設定の絶対ルール
 
 ### ⚠️ 重大な制約
