@@ -112,8 +112,8 @@
             >;
 
             sensor-bindings =
-                <&enc_scroll SCRL_UP SCRL_DOWN>,
-                <&enc_scroll SCRL_DOWN SCRL_UP>;
+                <&enc_scroll SCRL_RIGHT SCRL_LEFT>,
+                <&enc_scroll SCRL_RIGHT SCRL_LEFT>;
         };
 
         Num {
