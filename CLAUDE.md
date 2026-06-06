@@ -42,33 +42,22 @@ nix develop --command just pristine
 
 - `dax3_R`（右手）が **central**。キーマップ・レイヤー管理・トラックボールを担当
 - `dax3_L`（左手）が **peripheral**。エンコーダ入力のみ、レイヤー関連の設定は不要
-- `CONFIG_ZMK_OS_LAYER` など keymap に関わる設定は `dax3_R.conf` のみに記述する
+- keymap に関わる設定は `dax3_R.conf` のみに記述する
 
 ### PMW3610 トラックボール
 
-#### scroll-layers の挙動（重要）
+#### scroll-layers の挙動
 
-PMW3610 ドライバは `zmk_keymap_highest_layer_active()` で `scroll-layers` を判定する。
-Scroll(5) + Android(7) が同時 active な場合、最高レイヤーは 7 → Layer 5 は判定されない。
+PMW3610 ドライバは `zmk_keymap_highest_layer_active()` で `scroll-layers` を判定し、指定されたレイヤーがアクティブのときだけ XY 入力をスクロールイベントに変換する。
 
-**解決策**: `conditional_layers` で専用レイヤーを作り `scroll-layers` に追加する:
-
-```dts
-// scroll-layers = <5 10 11>;  // 5=Scroll, 10=ScrollAndroid, 11=ScrollWindows
-```
-
-#### per-layer スクロール方向の反転
-
-`input-listener` に per-layer override で実現する。`transform.dtsi` のインクルードが**必須**（auto-include されない）:
+現状の設定は Scroll レイヤー (5) を単独で指定:
 
 ```dts
-#include <input/processors/transform.dtsi>
-
-non_macos_scroll_override {
-  layers = <7 8>;
-  input-processors = <&zip_scroll_transform (INPUT_TRANSFORM_X_INVERT | INPUT_TRANSFORM_Y_INVERT)>;
-};
+// boards/shields/dax3/dax3_R.overlay
+scroll-layers = <5>;
 ```
+
+`scroll-layers` に複数レイヤーを並べる場合、`highest_layer_active()` の判定上、Scroll より上のレイヤーが同時 active になるとスクロール判定が外れる点に注意する。
 
 ### ロータリーエンコーダ
 - **型番**: EC11
@@ -144,7 +133,12 @@ sensors: sensors {
 
 **できない。** ZMK v0.3 に OS 自動検出機能は存在しない。USB HID descriptor 分析（QMK の `os_detection`）も
 BLE GATT 経由の OS 識別も未実装。BLE profile ベースのマッピングが唯一の手段。
-`app/src/os_layer.c` が `CONFIG_ZMK_OS_LAYER_PROFILE_N` Kconfig で profile→layer を定義している。
+
+現状この仕組みは未使用。BLE profile 切り替えに連動して overlay レイヤーをアクティブ化するカスタム
+モジュール `app/src/os_layer.c` と Kconfig `CONFIG_ZMK_OS_LAYER` は将来の再利用に備えて温存して
+あるが、`dax3_R.conf` には `CONFIG_ZMK_OS_LAYER=y` を入れていないため `os_layer.c` はビルドから
+除外される。再有効化したい場合は `dax3_R.conf` に `CONFIG_ZMK_OS_LAYER=y` と
+`CONFIG_ZMK_OS_LAYER_PROFILE_N=<layer>` を加え、keymap に対応するオーバーレイレイヤーを書き戻せばよい。
 
 ### CI が `led_red alias not found` で失敗する
 
@@ -191,22 +185,13 @@ ZMK を v0.3 から main に移行する際は、ボード名も `xiao_ble//zmk`
 
 | 番号 | 名前 | 説明 |
 |------|------|------|
-| 0 | default_layer | デフォルト（macOS） |
+| 0 | default_layer | デフォルト |
 | 1 | Symbol | 記号 |
 | 2 | Num | 数字 |
 | 3 | Function | ファンクション・矢印 |
 | 4 | Mouse | マウスボタン |
 | 5 | Scroll | スクロールモード |
 | 6 | Device | BLE設定 |
-| 7 | Android | Androidオーバーレイ（BLE profile 3） |
-| 8 | Windows | Windowsオーバーレイ（BLE profile 4） |
-| 9 | EmacsNav | Emacs風ナビゲーション |
-| 10 | ScrollAndroid | if-layers=\<5 7\> の conditional |
-| 11 | ScrollWindows | if-layers=\<5 8\> の conditional |
-| 12 | FuncAndroid | if-layers=\<3 7\> の conditional |
-| 13 | MouseAndroid | if-layers=\<4 7\> の conditional |
-
-BLE profile マッピング: 0-2 = macOS（overlay なし）、3 = Android（Layer 7）、4 = Windows（Layer 8）
 
 ## CI / デプロイ
 

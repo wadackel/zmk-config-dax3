@@ -1,6 +1,4 @@
 #include "dax3.dtsi"
-#include <dt-bindings/zmk/input_transform.h>
-#include <input/processors/transform.dtsi>
 
 &xiao_serial {
   status = "disabled";
@@ -26,11 +24,6 @@
   trackball_listener {
     compatible = "zmk,input-listener";
     device = <&trackball>;
-
-    non_macos_scroll_override {
-      layers = <7 8>;
-      input-processors = <&zip_scroll_transform (INPUT_TRANSFORM_X_INVERT | INPUT_TRANSFORM_Y_INVERT)>;
-    };
   };
 };
 
@@ -68,7 +61,7 @@
     spi-max-frequency = <2000000>;
     irq-gpios = <&gpio1 12 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;  // P1.12 (D7/MOTION)
 
-    scroll-layers = <5 10 11>;
+    scroll-layers = <5>;
   };
 };
 

@@ -28,37 +28,13 @@
         to_bluetooth {
             bindings = <&mo 6>;
             key-positions = <0 29>;
-            layers = <0 7 8>;
+            layers = <0>;
         };
 
         kl_scroll {
             bindings = <&mo 5>;
             key-positions = <20 21>;
-            layers = <0 7 8>;
-        };
-    };
-
-    conditional_layers {
-        compatible = "zmk,conditional-layers";
-
-        scroll_android {
-            if-layers = <5 7>;
-            then-layer = <10>;
-        };
-
-        scroll_windows {
-            if-layers = <5 8>;
-            then-layer = <11>;
-        };
-
-        func_android {
-            if-layers = <3 7>;
-            then-layer = <12>;
-        };
-
-        mouse_android {
-            if-layers = <4 7>;
-            then-layer = <13>;
+            layers = <0>;
         };
     };
 
@@ -181,79 +157,5 @@
                 <&enc_scroll SCRL_DOWN SCRL_UP>;
         };
 
-        Android {
-            bindings = <
-&trans  &trans  &trans  &trans  &trans          &trans                  &trans  &trans  &trans  &trans  &trans  &trans
-&mo 9   &trans  &trans  &trans  &trans          &trans                  &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans          &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &mt LGUI LANG2  &trans  &trans  &trans  &trans                  &trans
-            >;
-
-            sensor-bindings =
-                <&enc_scroll SCRL_DOWN SCRL_UP>,
-                <&enc_scroll SCRL_UP SCRL_DOWN>;
-        };
-
-        Windows {
-            bindings = <
-&trans  &trans  &trans  &trans  &trans           &trans                  &trans  &trans  &trans  &trans  &trans  &trans
-&mo 9   &trans  &trans  &trans  &trans           &trans                  &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans           &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &mt LCTRL LANG2  &trans  &trans  &trans  &trans                  &trans
-            >;
-
-            sensor-bindings =
-                <&enc_scroll SCRL_DOWN SCRL_UP>,
-                <&enc_scroll SCRL_UP SCRL_DOWN>;
-        };
-
-        EmacsNav {
-            bindings = <
-&kp LC(TAB)  &kp LC(Q)  &kp LC(W)  &kp END    &kp LC(R)  &kp LC(T)                  &kp LC(Y)  &kp LC(U)  &kp LC(I)  &kp LC(O)  &kp UP  &kp LC(MINUS)
-&trans       &kp HOME   &kp LC(S)  &kp DEL    &kp RIGHT  &kp LC(G)                  &kp BSPC   &kp LC(J)  &kp LC(K)  &kp LC(L)  &trans  &trans
-&trans       &kp LC(Z)  &kp LC(X)  &kp LC(C)  &kp LC(V)  &kp LEFT   &trans  &trans  &kp DOWN   &kp LC(M)  &trans     &trans     &trans  &trans
-                        &trans     &trans     &trans     &trans     &trans  &trans  &trans                           &trans
-            >;
-
-            sensor-bindings =
-                <&enc_scroll SCRL_DOWN SCRL_UP>,
-                <&enc_scroll SCRL_UP SCRL_DOWN>;
-        };
-
-        ScrollAndroid {
-            bindings = <
-&trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &trans  &trans  &trans  &trans  &trans                  &trans
-            >;
-        };
-
-        ScrollWindows {
-            bindings = <
-&trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans                  &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &trans  &trans  &trans  &trans  &trans                  &trans
-            >;
-        };
-
-        FuncAndroid {
-            bindings = <
-&trans  &trans  &trans  &trans  &trans  &kp LGUI                  &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans                    &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans    &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &trans  &trans    &trans  &trans  &trans                  &trans
-            >;
-        };
-
-        MouseAndroid {
-            bindings = <
-&trans  &trans  &trans  &trans  &trans  &trans                        &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans                        &trans  &trans  &trans  &trans  &trans  &trans
-&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans        &trans  &trans  &trans  &trans  &trans  &trans
-                &trans  &trans  &trans  &trans  &trans  &kp LG(LEFT)  &trans                  &trans
-            >;
-        };
     };
 };
