@@ -21,12 +21,14 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           zephyr = zephyr-nix.packages.${system};
+          # arm-zephyr-eabi ツールチェーン入りSDK。packagesとshellHookで同一derivationを参照する
+          sdk = zephyr.sdk-0_16.override { targets = ["arm-zephyr-eabi"]; };
         in {
           default = pkgs.mkShellNoCC {
             packages = [
               # Zephyr専用ツール
               zephyr.pythonEnv
-              (zephyr.sdk-0_16.override { targets = ["arm-zephyr-eabi"]; })
+              sdk
 
               # ZMKビルド専用ツール
               pkgs.cmake
@@ -40,35 +42,23 @@
               # ワークフロー必須ツール（環境の自己完結性のため）
               pkgs.git
               pkgs.just
-              pkgs.coreutils  # nproc等を提供
             ];
 
             shellHook = ''
               # プロジェクトルート検出（gitリポジトリルート）
-              if [ -d .git ]; then
-                PROJECT_ROOT="$PWD"
-              else
-                PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
-              fi
+              PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
 
               # Zephyr環境変数
               export ZEPHYR_BASE="$PROJECT_ROOT/zephyr"
               export ZEPHYR_TOOLCHAIN_VARIANT=zephyr
 
-              # SDK_INSTALL_DIR明示設定（zephyr-nixのパスを使用）
-              export ZEPHYR_SDK_INSTALL_DIR="${zephyr.sdk-0_16}"
+              # SDK_INSTALL_DIR明示設定（packagesと同一のSDK derivationを参照）
+              export ZEPHYR_SDK_INSTALL_DIR="${sdk}"
 
               # ccache設定
               export CCACHE_DIR="$PROJECT_ROOT/.ccache"
               export CCACHE_BASEDIR="$PROJECT_ROOT"  # パス差分によるキャッシュミス低減
               export CCACHE_MAXSIZE=2G
-              export USE_CCACHE=1
-
-              echo "ZMK Nix development environment loaded"
-              echo "Platform: $(uname -m)"
-              echo "Project: $PROJECT_ROOT"
-              echo "SDK: $ZEPHYR_SDK_INSTALL_DIR"
-              echo "Run 'just setup' to initialize west workspace"
             '';
           };
         }

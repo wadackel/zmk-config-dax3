@@ -32,7 +32,6 @@ nix develop --command just pristine
 - `app/` - カスタム ZMK モジュール（os_layer.c, Kconfig）
 - `boards/shields/dax3/` - Shield定義（dtsi, overlay, conf, Kconfig）
 - `config/` - キーマップ（`dax3.keymap`）、`west.yml`、ZMK Studio用 JSON
-- `scripts/` - justfile から呼ばれるビルドスクリプト
 - `tools/tester/` - キーマップテスターWebアプリ（Vite + HonoX）
 - `docs/` - 詳細な学びのドキュメント
 

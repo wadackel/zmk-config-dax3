@@ -124,10 +124,6 @@ just build
 │   └── dax3.keymap       # Keymap definition
 ├── boards/                # Board definitions
 │   └── shields/dax3/     # DAX3 shield configuration
-├── scripts/               # Build and utility scripts
-│   ├── setup.sh          # Workspace initialization
-│   ├── build-optimized.sh # Main build script
-│   └── build-nix.sh      # Nix-specific build logic
 └── build/                 # Build output (git-ignored)
 ```
 
