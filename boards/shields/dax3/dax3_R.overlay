@@ -24,6 +24,12 @@
   trackball_listener {
     compatible = "zmk,input-listener";
     device = <&trackball>;
+    input-processors = <&zip_mouse_gesture>;
+
+    mac_gesture_override {
+      layers = <7>;  // MAC_GESTURE layer
+      input-processors = <&zip_mouse_gesture_mac>;
+    };
   };
 };
 
