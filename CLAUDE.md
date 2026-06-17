@@ -43,20 +43,36 @@ nix develop --command just pristine
 - `dax3_L`（左手）が **peripheral**。エンコーダ入力のみ、レイヤー関連の設定は不要
 - keymap に関わる設定は `dax3_R.conf` のみに記述する
 
-### PMW3610 トラックボール
+### PAW3222 トラックボール
 
-#### scroll-layers の挙動
+dax3.2 基板から PAW3222 (PixArt) に切り替え。PMW3610 とは異なり、ドライバ自体は orientation / invert / scroll-layers のような Kconfig を持たず、raw `INPUT_REL_X` / `INPUT_REL_Y` のみを発行する。挙動チューニングは ZMK の input-processor チェーンで行う (`boards/shields/dax3/dax3_R.overlay`)。
 
-PMW3610 ドライバは `zmk_keymap_highest_layer_active()` で `scroll-layers` を判定し、指定されたレイヤーがアクティブのときだけ XY 入力をスクロールイベントに変換する。
+#### 構成の全体像
 
-現状の設定は Scroll レイヤー (5) を単独で指定:
+`trackball_listener` (`zmk,input-listener`) の input-processors チェーン:
 
-```dts
-// boards/shields/dax3/dax3_R.overlay
-scroll-layers = <5>;
-```
+- **default chain** (全レイヤー共通の起点): `<&zip_xy_transform 0>, <&zip_mouse_gesture>`
+  - 物理方向 → ユーザ視点方向への補正を最初に通し、その後マウスジェスチャを判定する
+- **scroll_override** (Scroll レイヤー = 5 のみ): `<&zip_xy_transform 0>, <&zip_xy_to_scroll_mapper>, <&zip_scroll_transform 0>, <&zip_scroll_scaler 1 4>`
+  - `zip_xy_to_scroll_mapper` が X→HWHEEL, Y→WHEEL に変換 (PMW3610 の `scroll-layers` 相当)
+  - `zip_scroll_scaler 1 N` の分母 N で粗さ調整 (大きいほどゆっくり)
+- **mac_gesture_override** (MAC_GESTURE レイヤー = 7): `<&zip_xy_transform 0>, <&zip_mouse_gesture_mac>`
 
-`scroll-layers` に複数レイヤーを並べる場合、`highest_layer_active()` の判定上、Scroll より上のレイヤーが同時 active になるとスクロール判定が外れる点に注意する。
+#### Transform flag の意味
+
+`<&zip_xy_transform FLAGS>` の `FLAGS` は `<dt-bindings/zmk/input_transform.h>` のビット OR:
+
+- `INPUT_TRANSFORM_XY_SWAP` — X と Y を入れ替え
+- `INPUT_TRANSFORM_X_INVERT` — X 軸反転
+- `INPUT_TRANSFORM_Y_INVERT` — Y 軸反転
+
+`zip_scroll_transform` も同じビットを使う (`INPUT_REL_WHEEL` / `INPUT_REL_HWHEEL` に対して効く)。
+
+PMW3610 の `CONFIG_PMW3610_ORIENTATION_180` + `CONFIG_PMW3610_INVERT_X` + `CONFIG_PMW3610_INVERT_Y` の net 効果は `x = -raw_x, y = raw_y` で、PAW3222 で再現するなら `<&zip_xy_transform (INPUT_TRANSFORM_X_INVERT)>` 相当 (実機調整必須)。
+
+#### CPI / 感度
+
+CPI は DTS の `res-cpi` プロパティで設定 (`res-cpi = <1000>` で PMW3610_CPI=1000 相当)。範囲は driver の `RES_MIN=608` 〜 `RES_MAX=4826` (`zmk-driver-paw3222/src/paw3222.c` の `RES_STEP * 16..127`)。
 
 ### ロータリーエンコーダ
 - **型番**: EC11
@@ -158,6 +174,22 @@ ZMK v0.3 は `seeeduino_xiao_ble` ボード名を使用する。`zmk-rgbled-widg
 
 ZMK を v0.3 から main に移行する際は、ボード名も `xiao_ble//zmk` に変更が必要。
 
+### zmk-driver-paw3222 の互換性
+
+`sekigon-gonnoc/zmk-driver-paw3222` は ZMK main を想定して開発されているが、現時点 (2026-06-15)
+の最新 main (`df652881`) は ZMK v0.3 でビルド可能。`revision: main` 直当ては rgbled-widget と
+同じく将来の破壊リスクがあるため `config/west.yml` で SHA をピン留めする:
+
+```yaml
+- name: zmk-driver-paw3222
+  remote: sekigon-gonnoc
+  revision: df652881  # Last version compatible with ZMK v0.3 (PAW3222 driver, verified 2026-06-15)
+```
+
+PAW3222 ドライバは raw `INPUT_REL_X` / `INPUT_REL_Y` のみ発行する設計のため、orientation /
+invert / scroll-layers は **driver Kconfig ではなく ZMK input-processor** で実装する。
+詳細は上の「PAW3222 トラックボール」節を参照。
+
 ### スクロールが一切反応しない
 
 **チェック項目:**
@@ -191,6 +223,7 @@ ZMK を v0.3 から main に移行する際は、ボード名も `xiao_ble//zmk`
 | 4 | Mouse | マウスボタン |
 | 5 | Scroll | スクロールモード |
 | 6 | Device | BLE設定 |
+| 7 | MacGesture | macOS用マウスジェスチャ (Mouse layerから遷移) |
 
 ## CI / デプロイ
 
