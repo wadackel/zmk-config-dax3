@@ -46,7 +46,6 @@
         stroke-size = <300>;
         enable-eager-mode;
         always-active;
-        suppress-movement;
         idle-timeout-ms = <150>;
         gesture-cooldown-ms = <200>;
 

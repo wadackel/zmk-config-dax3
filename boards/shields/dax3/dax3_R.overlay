@@ -40,7 +40,11 @@
 
     mac_gesture_override {
       layers = <7>;  // MAC_GESTURE layer
-      input-processors = <&zip_xy_transform (INPUT_TRANSFORM_XY_SWAP | INPUT_TRANSFORM_Y_INVERT)>, <&zip_mouse_gesture_mac>;
+      input-processors
+        = <&zip_xy_transform (INPUT_TRANSFORM_XY_SWAP | INPUT_TRANSFORM_Y_INVERT)>
+        , <&zip_mouse_gesture_mac>
+        , <&zip_xy_scaler 0 1>
+        ;
     };
   };
 };
