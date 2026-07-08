@@ -80,6 +80,19 @@ build-target TARGET="dax3_R": _require-nix
       exit 1
     fi
 
+# Launch the local keymap editor (tools/tester) on http://localhost:5173/
+editor:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd tools/tester
+    if [ ! -d node_modules ]; then
+      echo "Installing tester deps (first run)..."
+      pnpm install --frozen-lockfile
+    fi
+    echo "Editor: http://localhost:5173/"
+    echo "Tester: http://localhost:5173/tester"
+    exec pnpm dev
+
 # Clean build artifacts
 clean:
     @echo "Cleaning build artifacts..."

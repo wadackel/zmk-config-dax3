@@ -105,7 +105,7 @@
     sensors: sensors {
       compatible = "zmk,keymap-sensors";
       sensors = <&left_encoder &right_encoder>;
-      triggers-per-rotation = <24>;
+      triggers-per-rotation = <40>;  // steps(80)の整数約数 = 2 pulses/trigger
     };
 };
 

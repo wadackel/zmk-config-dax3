@@ -1,8 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Plugin } from 'vite'
-import { parseDefaultLayerBindings } from './parse-keymap'
-import { resolveEncoders, resolveKeys } from './resolve'
+import { parseKeymap } from '../app/lib/keymap-dt/parse'
+import type { BindingChain } from '../app/lib/keymap-dt/types'
+import { checkMatrixIntegrity, DAX3_KEY_COUNT } from '../app/lib/matrix-mapping'
+import { isReloadSuppressed } from './reload-guard'
+import { resolveEncoders, resolveKeys, type ParsedBinding } from './resolve'
 
 const VIRTUAL_MODULE_ID = 'virtual:zmk-layout'
 const RESOLVED_ID = '\0' + VIRTUAL_MODULE_ID
@@ -14,6 +17,15 @@ interface DaxLayout {
     }
   }
   sensors: Array<{ ref: string }>
+}
+
+function chainToParsedBinding(chain: BindingChain): ParsedBinding {
+  // BindingChain.tokens[0] is the behaviour name with leading `&` (e.g. `&kp`).
+  const behaviorWithAmp = chain.tokens[0] ?? ''
+  return {
+    behavior: behaviorWithAmp.startsWith('&') ? behaviorWithAmp.slice(1) : behaviorWithAmp,
+    args: chain.tokens.slice(1),
+  }
 }
 
 export function zmkLayout(): Plugin {
@@ -30,7 +42,20 @@ export function zmkLayout(): Plugin {
     const keymapContent = fs.readFileSync(keymapPath, 'utf-8')
 
     const physicalLayout = layout.layouts.default_layout.layout
-    const bindings = parseDefaultLayerBindings(keymapContent)
+    const parsed = parseKeymap(keymapContent)
+    const defaultLayer = parsed.layers.find((l) => l.name === 'default_layer')
+    if (!defaultLayer) {
+      throw new Error('zmkLayout: default_layer not found in keymap')
+    }
+    // A drift between the physical layout (dax3.json) and the matrix TRANSFORM
+    // silently produces mis-indexed keys, so fail the build before resolveKeys
+    // ever runs on mismatched data.
+    if (!checkMatrixIntegrity(physicalLayout.length)) {
+      throw new Error(
+        `zmkLayout: physical layout has ${physicalLayout.length} keys but the matrix TRANSFORM expects ${DAX3_KEY_COUNT}`,
+      )
+    }
+    const bindings: ParsedBinding[] = defaultLayer.bindings.map(chainToParsedBinding)
     const keys = resolveKeys(physicalLayout, bindings)
     const encoders = resolveEncoders(layout.sensors)
     const testableCount = keys.filter(k => k.testability !== 'untestable').length
@@ -71,6 +96,7 @@ export function zmkLayout(): Plugin {
         if (!watchFiles.includes(changedPath)) return
         const mod = server.moduleGraph.getModuleById(RESOLVED_ID)
         if (mod) server.moduleGraph.invalidateModule(mod)
+        if (isReloadSuppressed()) return
         server.ws.send({ type: 'full-reload' })
       })
     },

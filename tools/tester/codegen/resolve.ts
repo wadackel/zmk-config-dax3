@@ -1,5 +1,9 @@
-import type { ParsedBinding } from './parse-keymap'
 import { BEHAVIOR_TESTABILITY, CUSTOM_BEHAVIORS, LANG_KEYS, ZMK_KEYCODES } from './zmk-keycodes'
+
+export interface ParsedBinding {
+  behavior: string
+  args: string[]
+}
 
 // Structural copies of KeyDef / EncoderDef from app/lib/layout.ts
 // Defined here to avoid importing from layout.ts which re-exports from virtual:zmk-layout
