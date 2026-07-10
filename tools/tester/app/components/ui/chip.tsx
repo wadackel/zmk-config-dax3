@@ -37,10 +37,10 @@ export function Chip({
       title={title}
       onClick={onToggle}
       class={[
-        'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors select-none disabled:opacity-40 disabled:cursor-not-allowed',
+        'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-mono font-semibold transition-colors select-none disabled:opacity-40 disabled:cursor-not-allowed',
         selected
-          ? 'bg-accent-soft text-accent border-accent hover:bg-accent/25'
-          : 'bg-surface-3 text-fg-muted border-border hover:text-fg hover:bg-surface-4',
+          ? 'bg-accent-soft text-accent border-accent hover:brightness-95'
+          : 'bg-surface-0 text-fg-muted border-border hover:text-fg hover:bg-surface-2',
         className || '',
       ].join(' ')}
     >

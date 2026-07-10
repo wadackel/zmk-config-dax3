@@ -74,9 +74,9 @@ function EncoderWidget({
 
   let borderClass: string
   if (isFocused) {
-    borderClass = 'border-blue-500 shadow-[0_0_16px_rgba(59,130,246,0.5)]'
+    borderClass = 'border-accent shadow-[0_0_16px_rgb(79_91_107/0.5)]'
   } else if (isTested) {
-    borderClass = 'border-emerald-500'
+    borderClass = 'border-accent'
   } else {
     borderClass = 'border-border'
   }
@@ -439,7 +439,7 @@ export default function KeyboardTester() {
             type="button"
             onMouseDown={(e: MouseEvent) => e.stopPropagation()}
             onClick={handleReset}
-            class="px-4 py-2 text-sm font-mono bg-surface-3 border border-border text-fg-muted rounded hover:border-border-strong hover:text-fg transition-colors"
+            class="px-4 py-2 text-sm font-mono bg-surface-3 border border-border text-fg-muted rounded-md hover:border-border-strong hover:text-fg transition-colors"
           >
             Reset
           </button>

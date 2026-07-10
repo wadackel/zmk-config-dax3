@@ -10,8 +10,8 @@
 import type { JSX } from 'hono/jsx/jsx-runtime'
 import type { KeyDef } from '../lib/layout'
 
-export const UNIT = 72
-export const KEY_SIZE = 64
+export const UNIT = 64
+export const KEY_SIZE = 56
 export const KEY_OFFSET = 4
 export const RIGHT_X_OFFSET = 8.5
 

@@ -94,8 +94,8 @@ export function TextInput({ invalid, class: className, ...props }: TextInputProp
       {...props}
       aria-invalid={invalid ? 'true' : props['aria-invalid'] ?? undefined}
       class={[
-        'bg-surface-3 border rounded-md px-2 py-1 text-sm text-fg placeholder:text-fg-subtle',
-        'focus:outline-none focus-visible:border-accent',
+        'bg-surface-0 border rounded-lg px-3 py-2 text-sm text-fg placeholder:text-fg-subtle',
+        'focus:outline-none focus-visible:border-accent focus-visible:shadow-[var(--shadow-focus-ring)]',
         invalid ? 'border-danger' : 'border-border',
         className || '',
       ].join(' ')}
@@ -110,8 +110,8 @@ export function NativeSelect({ class: className, ...props }: NativeSelectProps) 
     <select
       {...props}
       class={[
-        'bg-surface-3 border border-border rounded-md px-2 py-1 text-sm text-fg',
-        'focus:outline-none focus-visible:border-accent',
+        'bg-surface-0 border border-border rounded-lg px-3 py-2 text-sm text-fg',
+        'focus:outline-none focus-visible:border-accent focus-visible:shadow-[var(--shadow-focus-ring)]',
         className || '',
       ].join(' ')}
     />

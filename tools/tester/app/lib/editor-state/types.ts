@@ -58,6 +58,8 @@ export type EditorAction =
   | { type: 'SET_ACTIVE_LAYER'; layerIdx: number }
   | { type: 'ADD_LAYER'; name: string }
   | { type: 'REMOVE_LAYER'; idx: number }
+  | { type: 'MOVE_LAYER'; fromIdx: number; toIdx: number }
+  | { type: 'RENAME_LAYER'; idx: number; name: string }
   | { type: 'SET_CLIPBOARD'; chain: BindingChain | null }
   | { type: 'UPDATE_BINDING'; layerIdx: number; keyIdx: number; chain: BindingChain }
   | {

@@ -276,7 +276,7 @@ export function KeycodeCombobox({
       <input
         ref={inputRef}
         type="text"
-        class="w-full bg-surface-3 border border-border-strong rounded px-2 py-1 text-fg font-mono"
+        class="w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg font-mono"
         value={query}
         placeholder={placeholder ?? 'type to search (e.g. lang, scroll, A)'}
         onFocus={() => setOpen(true)}
@@ -308,7 +308,7 @@ export function KeycodeCombobox({
         <div
           ref={listRef}
           role="listbox"
-          class="mt-1 max-h-[28rem] overflow-auto bg-surface-1 border border-border-strong rounded shadow-lg"
+          class="mt-1 max-h-[28rem] overflow-auto bg-surface-1 border border-border-strong rounded-md shadow-lg"
         >
           {items.length === 0 && (
             <div class="px-3 py-2 text-fg-subtle text-xs italic">
@@ -329,7 +329,7 @@ export function KeycodeCombobox({
                 data-idx={i}
                 data-token={token}
                 class={`flex items-center justify-between w-full text-left px-3 py-1 text-sm font-mono ${
-                  isActive ? 'bg-blue-700 text-fg' : 'text-fg hover:bg-surface-4'
+                  isActive ? 'bg-accent text-accent-fg' : 'text-fg hover:bg-surface-3'
                 }`}
                 onMouseEnter={() => setActiveIdx(i)}
                 onMouseDown={(e: Event) => e.preventDefault()} // keep input focus

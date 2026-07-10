@@ -1,149 +1,187 @@
-import { useEffect, useRef, useState } from 'hono/jsx'
-import { Button } from '../../components/ui/button'
-import { Chip } from '../../components/ui/chip'
-import { CommittingTextInput, Field } from '../../components/ui/field'
+import { useEffect, useState } from 'hono/jsx'
+import { KeyCap } from '../../components/ui/key-cap'
+import type { KeyCapState } from '../../components/ui/key-cap'
 import { useEditor } from '../../lib/editor-state/context'
-import { BindingPicker } from './binding-picker'
-import { KeyPositionSelector } from './key-position-selector'
+import { KEYS } from '../../lib/layout'
+import { KeyboardGrid } from '../../components/keyboard-grid'
+import { formatBindingForCell, mainLineSizeClass } from '../../lib/binding-display'
+import { ComboList } from './combos/combo-list'
+import { ComboInspector } from './inspector/combo-inspector'
 
+/**
+ * Combos tab redesign. Three-column shell:
+ *   - Left: ComboList
+ *   - Center: keyboard board that either shows the active combo's positions
+ *     highlighted (view mode) or accepts click-toggle input (pick mode).
+ *   - Right: ComboInspector
+ */
 export function CombosTab() {
   const { state, dispatch } = useEditor()
   const combos = state.draft.combos
   const layers = state.draft.layers
-  const [editingComboIdx, setEditingComboIdx] = useState<number | null>(null)
+  const activeLayer = layers[state.activeLayerIdx]
+  const [activeComboIdx, setActiveComboIdx] = useState<number | null>(
+    combos.length > 0 ? 0 : null,
+  )
+  const [pickMode, setPickMode] = useState(false)
 
-  const prevCountRef = useRef<number>(combos.length)
-  const lastItemRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
-    const prev = prevCountRef.current ?? combos.length
-    if (combos.length > prev) {
-      const el = lastItemRef.current
-      if (el && typeof el.scrollIntoView === 'function') {
-        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    if (combos.length === 0) {
+      setActiveComboIdx(null)
+    } else if (activeComboIdx === null || activeComboIdx >= combos.length) {
+      setActiveComboIdx(0)
+    }
+  }, [combos.length, activeComboIdx])
+
+  useEffect(() => {
+    if (activeComboIdx === null) setPickMode(false)
+  }, [activeComboIdx])
+
+  useEffect(() => {
+    if (!pickMode) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setPickMode(false)
       }
     }
-    prevCountRef.current = combos.length
-  }, [combos.length])
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pickMode])
+
+  const activeCombo = activeComboIdx !== null ? combos[activeComboIdx] : null
+  const positionSet = new Set(activeCombo?.keyPositions ?? [])
+
+  const togglePosition = (idx: number) => {
+    if (activeComboIdx === null || !activeCombo) return
+    const next = new Set(positionSet)
+    if (next.has(idx)) next.delete(idx)
+    else next.add(idx)
+    dispatch({
+      type: 'UPDATE_COMBO',
+      index: activeComboIdx,
+      combo: {
+        ...activeCombo,
+        keyPositions: Array.from(next).sort((a, b) => a - b),
+      },
+    })
+  }
 
   return (
-    <div class="flex flex-col gap-4">
-      <div class="flex justify-between items-center">
-        <h2 class="text-base font-semibold m-0">Combos ({combos.length})</h2>
-        <Button size="sm" variant="primary" onClick={() => dispatch({ type: 'ADD_COMBO' })}>
-          + Add combo
-        </Button>
-      </div>
-      {combos.length === 0 && (
-        <div class="text-fg-subtle text-sm">No combos defined.</div>
-      )}
-      {combos.map((combo, idx) => {
-        const activeLayerIndices = new Set(combo.layers)
-        return (
-          <div
-            key={idx}
-            ref={idx === combos.length - 1 ? lastItemRef : undefined}
-            class="border border-border rounded-md bg-surface-2 p-4 flex flex-col gap-3"
-          >
-            <div class="flex justify-between items-center gap-2">
-              <CommittingTextInput
-                value={combo.name}
-                aria-label="Combo name"
-                class="font-mono"
-                onCommit={(name) =>
-                  dispatch({
-                    type: 'UPDATE_COMBO',
-                    index: idx,
-                    combo: { ...combo, name },
-                  })
-                }
-              />
-              <Button size="xs" variant="plain" onClick={() => dispatch({ type: 'REMOVE_COMBO', index: idx })}>
-                <span class="text-danger">Remove</span>
-              </Button>
-            </div>
-            <Field label="Binding">
+    <div class="flex-1 min-h-0 min-w-0 flex bg-surface-0">
+      <ComboList
+        combos={combos}
+        activeIdx={activeComboIdx}
+        onSelect={setActiveComboIdx}
+        onAdd={() => {
+          dispatch({ type: 'ADD_COMBO' })
+          setActiveComboIdx(combos.length)
+        }}
+      />
+
+      <div class="flex-1 bg-surface-3 flex flex-col min-w-0 overflow-auto">
+        {activeCombo ? (
+          <>
+            <div class="flex items-center justify-between px-8 pt-4">
+              <div class="flex items-baseline gap-3">
+                <span class="text-[14px] font-semibold text-fg">{activeCombo.name}</span>
+                <span class="text-[11px] text-fg-subtle">
+                  Press highlighted keys together
+                </span>
+              </div>
               <button
                 type="button"
-                class="w-full text-left bg-surface-3 border border-border rounded-md px-2 py-1.5 text-sm font-mono text-fg hover:border-accent hover:bg-surface-4 transition-colors"
-                onClick={() => setEditingComboIdx(idx)}
-                title="Edit binding"
+                aria-pressed={pickMode ? 'true' : 'false'}
+                onClick={() => setPickMode((v) => !v)}
+                class={[
+                  'inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-[12px] transition-colors',
+                  pickMode
+                    ? 'bg-accent text-accent-fg border-accent shadow-[0_1px_2px_rgb(79_91_107/0.35)]'
+                    : 'bg-accent-soft text-accent border-accent/50 hover:brightness-95',
+                ].join(' ')}
               >
-                {combo.bindings.tokens.join(' ') || <span class="text-fg-subtle">&amp;none</span>}
+                <span aria-hidden="true">▢</span>
+                {pickMode ? 'Done — click to finish' : 'Pick positions on board'}
               </button>
-            </Field>
-            <Field
-              label="Layers"
-              group
-              hint={
-                activeLayerIndices.size === 0
-                  ? 'Empty = combo is active on every layer.'
-                  : `Active on ${activeLayerIndices.size} of ${layers.length} layer${layers.length === 1 ? '' : 's'}.`
-              }
-            >
-              <div class="flex flex-wrap gap-1.5">
-                {layers.length === 0 ? (
-                  <span class="text-fg-subtle text-xs">No layers defined.</span>
-                ) : (
-                  layers.map((layer, layerIdx) => {
-                    const selected = activeLayerIndices.has(layerIdx)
-                    return (
-                      <Chip
-                        key={layerIdx}
-                        selected={selected}
-                        title={layer.name}
-                        onToggle={() => {
-                          const next = new Set(activeLayerIndices)
-                          if (selected) next.delete(layerIdx)
-                          else next.add(layerIdx)
-                          dispatch({
-                            type: 'UPDATE_COMBO',
-                            index: idx,
-                            combo: { ...combo, layers: Array.from(next).sort((a, b) => a - b) },
-                          })
-                        }}
-                      >
-                        <span class="text-[10px] text-fg-subtle mr-1">{layerIdx}</span>
-                        <span>{layer.name}</span>
-                      </Chip>
-                    )
-                  })
-                )}
-              </div>
-            </Field>
-            <Field label="Key positions" hint="Click to toggle each position.">
-              <KeyPositionSelector
-                selected={combo.keyPositions}
-                onChange={(positions) =>
-                  dispatch({
-                    type: 'UPDATE_COMBO',
-                    index: idx,
-                    combo: { ...combo, keyPositions: positions },
-                  })
-                }
-              />
-            </Field>
-          </div>
-        )
-      })}
+            </div>
 
-      {editingComboIdx !== null && combos[editingComboIdx] && (
-        <BindingPicker
-          initial={combos[editingComboIdx].bindings}
-          onCancel={() => setEditingComboIdx(null)}
-          onCommit={(chain) => {
-            const target = combos[editingComboIdx]
-            if (!target) {
-              setEditingComboIdx(null)
-              return
-            }
-            dispatch({
-              type: 'UPDATE_COMBO',
-              index: editingComboIdx,
-              combo: { ...target, bindings: chain },
-            })
-            setEditingComboIdx(null)
+            <div class="flex-1 flex items-start justify-center px-8 pt-4 pb-10 min-w-0">
+              <KeyboardGrid
+                keys={KEYS}
+                renderCell={(k) => {
+                  const binding = activeLayer?.bindings[k.index]
+                  const display = binding
+                    ? formatBindingForCell(binding)
+                    : { topLine: '', mainLine: '', faint: true }
+                  const isInCombo = positionSet.has(k.index)
+                  const isTrans =
+                    binding &&
+                    binding.tokens.length === 1 &&
+                    binding.tokens[0] === '&trans'
+                  const isMod =
+                    binding &&
+                    binding.tokens.length > 0 &&
+                    binding.tokens[0].startsWith('&') &&
+                    binding.tokens[0] !== '&kp' &&
+                    binding.tokens[0] !== '&trans' &&
+                    binding.tokens[0] !== '&none'
+                  const capState: KeyCapState = isInCombo
+                    ? 'combo-target'
+                    : isTrans
+                      ? 'trans'
+                      : isMod
+                        ? 'mod'
+                        : 'idle'
+                  const mainColor = display.faint ? 'text-fg-subtle' : 'text-fg'
+                  return (
+                    <KeyCap
+                      state={capState}
+                      asButton
+                      hoverable={pickMode}
+                      interactive={pickMode}
+                      class="relative"
+                      title={`pos ${k.index}${binding ? ' · ' + binding.tokens.join(' ') : ''}`}
+                      onClick={() => {
+                        if (pickMode) togglePosition(k.index)
+                      }}
+                    >
+                      {display.topLine && (
+                        <span class="absolute top-0.5 inset-x-1 text-[8px] text-fg-subtle leading-none truncate text-left">
+                          {display.topLine}
+                        </span>
+                      )}
+                      <span class={`${mainLineSizeClass(display.mainLine)} ${mainColor}`}>
+                        {display.mainLine}
+                      </span>
+                    </KeyCap>
+                  )
+                }}
+              />
+            </div>
+          </>
+        ) : (
+          <div class="flex-1 flex items-center justify-center text-fg-subtle text-[13px]">
+            Click + to add a combo
+          </div>
+        )}
+      </div>
+
+      {activeCombo && activeComboIdx !== null ? (
+        <ComboInspector
+          combo={activeCombo}
+          layers={layers}
+          pickMode={pickMode}
+          onChange={(next) =>
+            dispatch({ type: 'UPDATE_COMBO', index: activeComboIdx, combo: next })
+          }
+          onRemove={() => {
+            dispatch({ type: 'REMOVE_COMBO', index: activeComboIdx })
           }}
+          onEnterPickMode={() => setPickMode(true)}
+          onExitPickMode={() => setPickMode(false)}
         />
+      ) : (
+        <aside class="w-[340px] flex-none border-l border-border-subtle bg-surface-1" />
       )}
     </div>
   )

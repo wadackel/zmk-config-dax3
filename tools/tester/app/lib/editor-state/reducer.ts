@@ -72,6 +72,82 @@ export function shiftLayerRefsOnRemove(draft: EditorDraft, removedIdx: number): 
 }
 
 /**
+ * Computes the `old → new` index mapping for a MOVE_LAYER (fromIdx → toIdx).
+ * Layers between the two positions shift by ±1; layers outside the affected
+ * range keep their index. Exported for tests and for MOVE_LAYER's own use.
+ *
+ * Example: layers = [A, B, C, D], MOVE 1 → 3 gives map = [0, 3, 1, 2]
+ * (B moves to slot 3, C and D shift left by 1).
+ */
+export function computeMoveMap(
+  fromIdx: number,
+  toIdx: number,
+  layerCount: number,
+): number[] {
+  const map = Array.from({ length: layerCount }, (_, i) => i)
+  if (fromIdx === toIdx) return map
+  if (fromIdx < 0 || fromIdx >= layerCount) return map
+  if (toIdx < 0 || toIdx >= layerCount) return map
+  map[fromIdx] = toIdx
+  if (fromIdx < toIdx) {
+    for (let i = fromIdx + 1; i <= toIdx; i++) map[i] = i - 1
+  } else {
+    for (let i = toIdx; i < fromIdx; i++) map[i] = i + 1
+  }
+  return map
+}
+
+/**
+ * Rewrites every layer-index reference in `draft` using an `old → new`
+ * mapping (produced by `computeMoveMap`). Non-numeric arguments (e.g. a
+ * preprocessor `#define` name) are left as-is because our `#define`s do not
+ * carry numeric indices today.
+ */
+export function remapLayerRefs(draft: EditorDraft, map: number[]): EditorDraft {
+  const remap = (n: number): number => (n >= 0 && n < map.length ? map[n]! : n)
+  const remapChain = (chain: BindingChain): BindingChain => {
+    const head = chain.tokens[0]
+    if (!head) return chain
+    if (LAYER_INDEX_BEHAVIORS.has(head) || LAYER_TAP_BEHAVIORS.has(head)) {
+      const ref = chain.tokens[1]
+      const n = Number(ref)
+      if (!Number.isInteger(n)) return chain
+      const next = remap(n)
+      if (next === n) return chain
+      return { tokens: [head, String(next), ...chain.tokens.slice(2)] }
+    }
+    return chain
+  }
+  return {
+    ...draft,
+    layers: draft.layers.map((l) => ({
+      ...l,
+      bindings: l.bindings.map(remapChain),
+      sensorBindings: l.sensorBindings
+        ? { perEncoder: l.sensorBindings.perEncoder.map(remapChain) }
+        : null,
+    })),
+    combos: draft.combos.map((c) => ({
+      ...c,
+      bindings: remapChain(c.bindings),
+      layers: c.layers.map(remap),
+    })),
+    macros: draft.macros.map((m) => ({
+      ...m,
+      bindingsList: m.bindingsList.map(remapChain),
+    })),
+    behaviors: draft.behaviors.map((b) => ({
+      ...b,
+      bindings: b.bindings?.map(remapChain),
+    })),
+    mouseGestures: draft.mouseGestures.map((g) => ({
+      ...g,
+      entries: g.entries.map((e) => ({ ...e, bindings: remapChain(e.bindings) })),
+    })),
+  }
+}
+
+/**
  * Reports how many binding chains in `draft` would be replaced with `&trans`
  * if layer `idx` were removed (i.e. references to that specific layer index).
  * Used by the Layers tab to surface a confirmation count before deletion.
@@ -200,6 +276,62 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         future: [],
         activeLayerIdx: Math.max(0, nextActive),
       }
+    }
+
+    case 'MOVE_LAYER': {
+      const { fromIdx, toIdx } = action
+      const layers = state.draft.layers
+      if (
+        fromIdx === toIdx ||
+        fromIdx < 0 ||
+        fromIdx >= layers.length ||
+        toIdx < 0 ||
+        toIdx >= layers.length
+      ) {
+        return state
+      }
+      // codegen/vite-plugin.ts:46 looks up default_layer by name at idx 0, and
+      // ZMK's base layer is always layer 0; letting either endpoint be idx 0
+      // would rearrange those invariants and break the build downstream.
+      if (fromIdx === 0 || toIdx === 0) return state
+      const map = computeMoveMap(fromIdx, toIdx, layers.length)
+      const reordered = layers.map((_, i) => layers[map.indexOf(i)]!)
+      const nextActive = map[state.activeLayerIdx] ?? state.activeLayerIdx
+      const nextDraft = remapLayerRefs(
+        { ...state.draft, layers: reordered },
+        map,
+      )
+      return {
+        ...state,
+        draft: nextDraft,
+        past: pushHistory(state.past, state.draft),
+        future: [],
+        activeLayerIdx: nextActive,
+      }
+    }
+
+    case 'RENAME_LAYER': {
+      const { idx, name } = action
+      const trimmed = name.trim()
+      if (!trimmed) return state
+      if (idx < 0 || idx >= state.draft.layers.length) return state
+      // idx 0 must remain `default_layer` — codegen/vite-plugin.ts:46 looks it
+      // up by name at build time, so a rename would break the ZMK build.
+      if (idx === 0) return state
+      // DT identifier rule (mirrors AddLayerDialog): first char letter/underscore,
+      // rest letters/digits/underscores. Spaces or leading digits produce invalid
+      // DTS at serialize time.
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed)) return state
+      const currentName = state.draft.layers[idx]!.name
+      if (trimmed === currentName) return state
+      // Reject collisions with any other layer's name — DT identifiers must
+      // be unique within the keymap node.
+      if (state.draft.layers.some((l, i) => i !== idx && l.name === trimmed)) {
+        return state
+      }
+      return mutateDraft(state, (d) => {
+        d.layers = d.layers.map((l, i) => (i === idx ? { ...l, name: trimmed } : l))
+      })
     }
 
     case 'UPDATE_BINDING':

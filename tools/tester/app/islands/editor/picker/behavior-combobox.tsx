@@ -142,7 +142,7 @@ export function BehaviorCombobox({ value, onChange }: Props) {
       <input
         ref={inputRef}
         type="text"
-        class="w-full bg-surface-3 border border-border-strong rounded px-2 py-1 text-fg font-mono"
+        class="w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg font-mono"
         value={open ? query : current ? `${current.token} — ${current.label}` : value}
         placeholder="search behaviour (e.g. tap, layer, mod)"
         onFocus={(e: Event) => {
@@ -163,7 +163,7 @@ export function BehaviorCombobox({ value, onChange }: Props) {
         <div
           ref={listRef}
           role="listbox"
-          class="mt-1 max-h-[24rem] overflow-auto bg-surface-1 border border-border-strong rounded shadow-lg"
+          class="mt-1 max-h-[24rem] overflow-auto bg-surface-1 border border-border-strong rounded-md shadow-lg"
         >
           {rows.length === 0 && (
             <div class="px-3 py-2 text-fg-subtle text-xs italic">No matching behaviour</div>
@@ -190,7 +190,7 @@ export function BehaviorCombobox({ value, onChange }: Props) {
                 data-row={i}
                 data-token={row.entry.token}
                 class={`flex items-center justify-between w-full text-left px-3 py-1 text-sm font-mono ${
-                  isActive ? 'bg-blue-700 text-fg' : 'text-fg hover:bg-surface-4'
+                  isActive ? 'bg-accent text-accent-fg' : 'text-fg hover:bg-surface-3'
                 }`}
                 onMouseEnter={() => setActiveIdx(i)}
                 onMouseDown={(e: Event) => e.preventDefault()}

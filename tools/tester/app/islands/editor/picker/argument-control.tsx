@@ -39,8 +39,8 @@ export function ArgumentControl({
   label,
   autoFocus,
 }: Props) {
-  const wrapperClass = `flex flex-col gap-1 p-2 rounded border ${
-    isActive ? 'border-blue-500' : 'border-border'
+  const wrapperClass = `flex flex-col gap-1 p-2 rounded-md border ${
+    isActive ? 'border-accent' : 'border-border'
   }`
 
   return (
@@ -117,7 +117,7 @@ function ArgumentInput({
       return (
         <input
           type="text"
-          class="w-full bg-surface-3 border border-border-strong rounded px-2 py-1 text-fg font-mono"
+          class="w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg font-mono"
           value={value}
           autoFocus={autoFocus}
           onInput={(e: Event) => onChange((e.target as HTMLInputElement).value)}
@@ -159,7 +159,7 @@ function LayerSelect({
 
   return (
     <select
-      class="w-full bg-surface-3 border border-border-strong rounded px-2 py-1 text-fg font-mono"
+      class="w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg font-mono"
       autoFocus={autoFocus}
       onChange={(e: Event) => onChange((e.target as HTMLSelectElement).value)}
     >
@@ -198,7 +198,7 @@ function NativeSelect({
   // before children mount. Mark the target <option> as `selected` instead.
   return (
     <select
-      class="w-full bg-surface-3 border border-border-strong rounded px-2 py-1 text-fg font-mono"
+      class="w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg font-mono"
       autoFocus={autoFocus}
       onChange={(e: Event) => onChange((e.target as HTMLSelectElement).value)}
     >

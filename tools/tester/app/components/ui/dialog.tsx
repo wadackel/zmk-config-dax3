@@ -262,7 +262,7 @@ export function Dialog({
           onClick={(e: Event) => e.stopPropagation()}
           onKeyDown={handleKeyDown}
           class={[
-            'bg-surface-dialog border border-border-strong rounded-lg shadow-popover',
+            'bg-surface-dialog border border-border rounded-xl shadow-popover',
             'max-h-[85vh] overflow-auto flex flex-col',
             SIZE[size],
             panelClass || '',

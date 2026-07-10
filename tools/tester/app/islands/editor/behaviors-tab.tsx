@@ -1,331 +1,231 @@
-import { CommittingTextInput, Field, NativeSelect } from '../../components/ui/field'
+import { useState } from 'hono/jsx'
+import { CommittingTextInput } from '../../components/ui/field'
+import { useEditor } from '../../lib/editor-state/context'
 import {
-  formatPropValue,
   getBehaviorSchema,
   getRootBehaviorSchema,
-  parsePropValue,
-  type PropKind,
   type PropSchema,
 } from '../../lib/behavior-prop-schema'
-import { useEditor } from '../../lib/editor-state/context'
-import type { BehaviorEntry, RootBehaviorConfig } from '../../lib/keymap-dt/types'
+import type {
+  BehaviorEntry,
+  RootBehaviorConfig,
+} from '../../lib/keymap-dt/types'
+import { BehaviorList, type BehaviorSelection } from './behaviors/behavior-list'
+import { PropGrid, type PropRow } from './behaviors/prop-grid'
+import { BehaviorAddPropInspector } from './inspector/behavior-add-prop-inspector'
 
+/**
+ * Behaviors tab redesign. Three-column shell:
+ *   - Left: BehaviorList (GLOBAL &mt/&lt + CUSTOM)
+ *   - Center: header + schema-driven PropGrid
+ *   - Right: BehaviorAddPropInspector — search + suggested + custom raw
+ *
+ * `getBehaviorSchema(compatible)` / `getRootBehaviorSchema(kind)` yield the
+ * schema rows; unused rows surface as suggestions in the Add pane.
+ */
 export function BehaviorsTab() {
   const { state, dispatch } = useEditor()
   const behaviors = state.draft.behaviors
   const rootBehaviors = state.draft.rootBehaviors
+  const [selection, setSelection] = useState<BehaviorSelection>(
+    rootBehaviors.length > 0
+      ? { kind: 'root', idx: 0 }
+      : { kind: 'custom', idx: 0 },
+  )
+
+  const selectedRoot =
+    selection.kind === 'root' ? rootBehaviors[selection.idx] : null
+  const selectedCustom =
+    selection.kind === 'custom' ? behaviors[selection.idx] : null
+
+  const schema: readonly PropSchema[] = selectedRoot
+    ? getRootBehaviorSchema(selectedRoot.kind)
+    : selectedCustom
+      ? getBehaviorSchema(selectedCustom.compatible)
+      : []
+
+  const currentProps = selectedRoot?.props ?? selectedCustom?.props ?? []
+  const known = new Set(schema.map((s) => s.name))
+  const rows: PropRow[] = schema.map((s) => ({
+    schema: s,
+    rawValue: currentProps.find((p) => p.name === s.name)?.value,
+  }))
+  const suggestions = schema.filter(
+    (s) => !currentProps.some((p) => p.name === s.name),
+  )
+
+  const updateProp = (name: string, rawValue: string | undefined) => {
+    if (selection.kind === 'root' && selectedRoot) {
+      const existing = selectedRoot.props.findIndex((p) => p.name === name)
+      let nextProps: RootBehaviorConfig['props']
+      if (rawValue === undefined) {
+        nextProps =
+          existing >= 0
+            ? selectedRoot.props.filter((_, i) => i !== existing)
+            : selectedRoot.props
+      } else if (existing >= 0) {
+        nextProps = selectedRoot.props.map((p, i) =>
+          i === existing ? { ...p, value: rawValue } : p,
+        )
+      } else {
+        nextProps = [...selectedRoot.props, { name, value: rawValue }]
+      }
+      dispatch({
+        type: 'UPDATE_ROOT_BEHAVIOR',
+        index: selection.idx,
+        cfg: { ...selectedRoot, props: nextProps },
+      })
+    } else if (selection.kind === 'custom' && selectedCustom) {
+      const existing = selectedCustom.props.findIndex((p) => p.name === name)
+      let nextProps: BehaviorEntry['props']
+      if (rawValue === undefined) {
+        nextProps =
+          existing >= 0
+            ? selectedCustom.props.filter((_, i) => i !== existing)
+            : selectedCustom.props
+      } else if (existing >= 0) {
+        nextProps = selectedCustom.props.map((p, i) =>
+          i === existing ? { ...p, value: rawValue } : p,
+        )
+      } else {
+        nextProps = [...selectedCustom.props, { name, value: rawValue }]
+      }
+      dispatch({
+        type: 'UPDATE_BEHAVIOR',
+        index: selection.idx,
+        behavior: { ...selectedCustom, props: nextProps },
+      })
+    }
+  }
+
+  const renameCustom = (name: string) => {
+    if (selection.kind !== 'custom' || !selectedCustom) return
+    dispatch({
+      type: 'UPDATE_BEHAVIOR',
+      index: selection.idx,
+      behavior: { ...selectedCustom, name },
+    })
+  }
+
+  const headerTitle = selectedRoot
+    ? `&${selectedRoot.kind}`
+    : selectedCustom
+      ? `&${selectedCustom.name}`
+      : '—'
+  const headerSubtitle = selectedRoot
+    ? selectedRoot.kind === 'mt'
+      ? 'mod-tap · global behaviour'
+      : 'layer-tap · global behaviour'
+    : selectedCustom
+      ? 'custom behaviour'
+      : ''
+  const headerBadge = selectedRoot
+    ? `compatible = "zmk,behavior-hold-tap"`
+    : selectedCustom
+      ? `compatible = ${selectedCustom.compatible}`
+      : ''
 
   return (
-    <div class="flex flex-col gap-6">
-      <section class="flex flex-col gap-3">
-        <h2 class="text-base font-semibold m-0">Custom behaviours ({behaviors.length})</h2>
-        {behaviors.length === 0 && (
-          <div class="text-fg-subtle text-sm">No custom behaviours defined.</div>
+    <div class="flex-1 min-h-0 min-w-0 flex bg-surface-0">
+      <BehaviorList
+        root={rootBehaviors}
+        custom={behaviors}
+        active={selection}
+        onSelect={setSelection}
+      />
+
+      <div class="flex-1 bg-surface-3 flex flex-col min-w-0 overflow-auto p-8 gap-5">
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="text-[22px] font-mono font-bold leading-tight tracking-tight">
+            {headerTitle}
+          </span>
+          <span class="text-[12px] text-fg-subtle">{headerSubtitle}</span>
+          <span class="ml-auto text-[11px] font-mono text-fg-subtle bg-surface-4 rounded-md px-2 py-1">
+            {headerBadge}
+          </span>
+        </div>
+
+        {selectedCustom && (
+          <div class="flex items-center gap-3">
+            <span class="text-[12px] font-semibold text-fg-muted">name</span>
+            <CommittingTextInput
+              class="font-mono"
+              value={selectedCustom.name}
+              onCommit={renameCustom}
+            />
+          </div>
         )}
-        {behaviors.map((b, idx) => (
-          <BehaviorCard
-            key={idx}
-            behavior={b}
-            onChange={(next) =>
-              dispatch({ type: 'UPDATE_BEHAVIOR', index: idx, behavior: next })
+
+        {rows.length > 0 ? (
+          <PropGrid rows={rows} onChange={updateProp} />
+        ) : (
+          <div class="p-5 rounded-xl bg-surface-0 border border-border text-[12px] text-fg-subtle">
+            Schema undefined — edit via the raw editor.
+          </div>
+        )}
+
+        {selectedCustom && (
+          <UnknownRawProps
+            props={selectedCustom.props.filter((p) => !known.has(p.name))}
+            onChange={(nextUnknown) =>
+              dispatch({
+                type: 'UPDATE_BEHAVIOR',
+                index: selection.idx,
+                behavior: {
+                  ...selectedCustom,
+                  props: [
+                    ...selectedCustom.props.filter((p) => known.has(p.name)),
+                    ...nextUnknown,
+                  ],
+                },
+              })
             }
           />
-        ))}
-      </section>
+        )}
 
-      <section class="flex flex-col gap-3">
-        <h2 class="text-base font-semibold m-0">
-          Global behaviour configs (&amp;mt / &amp;lt)
-        </h2>
-        {rootBehaviors.map((rb, idx) => (
-          <RootBehaviorCard
-            key={idx}
-            cfg={rb}
-            onChange={(next) =>
-              dispatch({ type: 'UPDATE_ROOT_BEHAVIOR', index: idx, cfg: next })
-            }
-          />
-        ))}
-      </section>
-    </div>
-  )
-}
-
-function BehaviorCard({
-  behavior,
-  onChange,
-}: {
-  behavior: BehaviorEntry
-  onChange: (next: BehaviorEntry) => void
-}) {
-  const schema = getBehaviorSchema(behavior.compatible)
-  const known = new Set(schema.map((s) => s.name))
-  const unknown = behavior.props.filter((p) => !known.has(p.name))
-
-  const updateNamed = (schemaName: string, rawValue: string | undefined) => {
-    let nextProps: BehaviorEntry['props']
-    const existing = behavior.props.findIndex((p) => p.name === schemaName)
-    if (rawValue === undefined) {
-      // Remove
-      nextProps = existing >= 0 ? behavior.props.filter((_, i) => i !== existing) : behavior.props
-    } else if (existing >= 0) {
-      nextProps = behavior.props.map((p, i) =>
-        i === existing ? { ...p, value: rawValue } : p,
-      )
-    } else {
-      nextProps = [...behavior.props, { name: schemaName, value: rawValue }]
-    }
-    onChange({ ...behavior, props: nextProps })
-  }
-
-  return (
-    <div class="border border-border rounded-md bg-surface-2 p-4 flex flex-col gap-3">
-      <div class="flex justify-between items-center gap-2">
-        <div class="flex flex-col gap-0.5 min-w-0">
-          <CommittingTextInput
-            aria-label="Behaviour label"
-            class="font-mono"
-            value={behavior.name}
-            onCommit={(name) => onChange({ ...behavior, name })}
-          />
+        <div class="flex items-center gap-2 text-[11.5px] text-fg-subtle">
+          <span class="text-success font-mono">✓</span>
+          Fields generated from behavior-prop-schema.ts. Unknown properties can be edited as raw.
         </div>
-        <span class="text-[10px] text-fg-subtle font-mono shrink-0">
-          {behavior.compatible}
-        </span>
       </div>
 
-      {schema.length > 0 && (
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {schema.map((s) => {
-            const prop = behavior.props.find((p) => p.name === s.name)
-            return (
-              <TypedPropField
-                key={s.name}
-                schema={s}
-                idPrefix={`behavior-${behavior.name}`}
-                rawValue={prop?.value}
-                onChangeRaw={(next) => updateNamed(s.name, next)}
-              />
-            )
-          })}
-        </div>
-      )}
-
-      <RawPropsAdvanced
-        props={unknown}
-        onChange={(nextUnknown) =>
-          onChange({
-            ...behavior,
-            props: [
-              ...behavior.props.filter((p) => known.has(p.name)),
-              ...nextUnknown,
-            ],
-          })
-        }
+      <BehaviorAddPropInspector
+        suggestions={[...suggestions]}
+        onAddKnown={(s) => {
+          // Seed the new prop with a schema-appropriate initial value so
+          // adding a row does not immediately serialize an empty DT value.
+          // bool = presence-only flag; int/int-ms = min bound (or 0);
+          // enum = first option; raw = empty string for the user to fill.
+          const kind = s.kind
+          if (kind.type === 'bool') {
+            updateProp(s.name, '')
+          } else if (kind.type === 'int' || kind.type === 'int-ms') {
+            updateProp(s.name, `<${kind.min ?? 0}>`)
+          } else if (kind.type === 'enum') {
+            const first = kind.options[0]
+            updateProp(s.name, first ? `"${first}"` : '')
+          } else {
+            updateProp(s.name, '')
+          }
+        }}
+        onAddCustom={(name, value) => updateProp(name, value)}
       />
     </div>
   )
 }
 
-function RootBehaviorCard({
-  cfg,
-  onChange,
-}: {
-  cfg: RootBehaviorConfig
-  onChange: (next: RootBehaviorConfig) => void
-}) {
-  const schema = getRootBehaviorSchema(cfg.kind)
-  const known = new Set(schema.map((s) => s.name))
-  const unknown = cfg.props.filter((p) => !known.has(p.name))
-
-  const updateNamed = (schemaName: string, rawValue: string | undefined) => {
-    let nextProps: RootBehaviorConfig['props']
-    const existing = cfg.props.findIndex((p) => p.name === schemaName)
-    if (rawValue === undefined) {
-      nextProps = existing >= 0 ? cfg.props.filter((_, i) => i !== existing) : cfg.props
-    } else if (existing >= 0) {
-      nextProps = cfg.props.map((p, i) =>
-        i === existing ? { ...p, value: rawValue } : p,
-      )
-    } else {
-      nextProps = [...cfg.props, { name: schemaName, value: rawValue }]
-    }
-    onChange({ ...cfg, props: nextProps })
-  }
-
-  return (
-    <div class="border border-border rounded-md bg-surface-2 p-4 flex flex-col gap-3">
-      <div class="text-xs font-mono text-fg-muted">&amp;{cfg.kind}</div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {schema.map((s) => {
-          const prop = cfg.props.find((p) => p.name === s.name)
-          return (
-            <TypedPropField
-              key={s.name}
-              schema={s}
-              idPrefix={`root-${cfg.kind}`}
-              rawValue={prop?.value}
-              onChangeRaw={(next) => updateNamed(s.name, next)}
-            />
-          )
-        })}
-      </div>
-      <RawPropsAdvanced
-        props={unknown}
-        onChange={(nextUnknown) =>
-          onChange({
-            ...cfg,
-            props: [
-              ...cfg.props.filter((p) => known.has(p.name)),
-              ...nextUnknown,
-            ],
-          })
-        }
-      />
-    </div>
-  )
-}
-
-function TypedPropField({
-  schema,
-  idPrefix,
-  rawValue,
-  onChangeRaw,
-}: {
-  schema: PropSchema
-  /** Scoping segment so `htmlFor`/`aria-describedby` uniquely target each
-   *  card's field even when the same well-known prop (e.g. `tapping-term-ms`)
-   *  appears on multiple hold-tap behaviours or root configs. */
-  idPrefix: string
-  rawValue: string | undefined
-  onChangeRaw: (next: string | undefined) => void
-}) {
-  const kind = schema.kind
-  const fieldId = `${idPrefix}-${schema.name}`
-  const parsed = rawValue !== undefined ? parsePropValue(kind, rawValue) : undefined
-  const parseFailed = rawValue !== undefined && parsed === undefined && kind.type !== 'bool'
-
-  switch (kind.type) {
-    case 'int':
-    case 'int-ms': {
-      const numeric = typeof parsed === 'number' ? parsed : undefined
-      return (
-        <Field
-          htmlFor={fieldId}
-          label={
-            <span>
-              {schema.label ?? schema.name}
-              {kind.type === 'int-ms' && (
-                <span class="text-fg-subtle text-[10px] ml-1 font-mono">ms</span>
-              )}
-              <span class="text-fg-subtle text-[10px] ml-1 font-mono">{schema.name}</span>
-            </span>
-          }
-          hint={parseFailed ? undefined : schema.hint}
-          error={parseFailed ? `Cannot parse "${rawValue}" as number` : undefined}
-        >
-          <CommittingTextInput
-            id={fieldId}
-            type="number"
-            inputMode="numeric"
-            min={kind.min}
-            max={kind.max}
-            invalid={parseFailed}
-            value={numeric !== undefined ? String(numeric) : ''}
-            onCommit={(v) => {
-              if (v === '') onChangeRaw(undefined)
-              else onChangeRaw(formatPropValue(kind, Number(v)))
-            }}
-          />
-        </Field>
-      )
-    }
-    case 'enum': {
-      const value = typeof parsed === 'string' ? parsed : ''
-      return (
-        <Field
-          htmlFor={fieldId}
-          label={
-            <span>
-              {schema.label ?? schema.name}
-              <span class="text-fg-subtle text-[10px] ml-1 font-mono">{schema.name}</span>
-            </span>
-          }
-          hint={schema.hint}
-        >
-          <NativeSelect
-            id={fieldId}
-            value={value}
-            onChange={(e: Event) => {
-              const v = (e.target as HTMLSelectElement).value
-              if (!v) onChangeRaw(undefined)
-              else onChangeRaw(formatPropValue(kind, v))
-            }}
-          >
-            <option value="">(default)</option>
-            {kind.options.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-      )
-    }
-    case 'bool': {
-      const enabled = rawValue !== undefined
-      return (
-        <Field
-          htmlFor={fieldId}
-          label={
-            <span>
-              {schema.label ?? schema.name}
-              <span class="text-fg-subtle text-[10px] ml-1 font-mono">{schema.name}</span>
-            </span>
-          }
-          hint={schema.hint}
-        >
-          <label class="inline-flex items-center gap-2 text-sm text-fg">
-            <input
-              id={fieldId}
-              type="checkbox"
-              class="accent-accent"
-              checked={enabled}
-              onChange={(e: Event) => {
-                const on = (e.target as HTMLInputElement).checked
-                onChangeRaw(on ? '' : undefined)
-              }}
-            />
-            <span class="text-fg-muted">Enabled</span>
-          </label>
-        </Field>
-      )
-    }
-    case 'raw':
-      return (
-        <Field htmlFor={fieldId} label={schema.label ?? schema.name} hint={schema.hint}>
-          <CommittingTextInput
-            id={fieldId}
-            class="font-mono"
-            value={rawValue ?? ''}
-            onCommit={(v) => onChangeRaw(v === '' ? undefined : v)}
-          />
-        </Field>
-      )
-  }
-}
-
-function RawPropsAdvanced({
+function UnknownRawProps({
   props,
   onChange,
 }: {
   props: { name: string; value: string }[]
   onChange: (next: { name: string; value: string }[]) => void
 }) {
+  if (props.length === 0) return null
   return (
     <details class="text-sm">
-      <summary class="cursor-pointer text-xs text-fg-muted hover:text-fg select-none">
-        Advanced DT properties {props.length > 0 && `(${props.length})`}
+      <summary class="cursor-pointer text-xs text-fg-muted hover:text-fg select-none font-mono uppercase tracking-wider">
+        Raw properties ({props.length})
       </summary>
       <div class="mt-2 flex flex-col gap-1.5">
         {props.map((p, pi) => (

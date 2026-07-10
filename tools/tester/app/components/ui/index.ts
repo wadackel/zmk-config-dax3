@@ -16,5 +16,13 @@ export type {
   NativeSelectProps,
   TextInputProps,
 } from './field'
+export { MiniCode } from './mini-code'
+export type { MiniCodeProps } from './mini-code'
+export { SegmentedControl } from './segmented-control'
+export type { SegmentedControlProps, SegmentedOption } from './segmented-control'
+export { Slider } from './slider'
+export type { SliderProps } from './slider'
+export { Toggle } from './toggle'
+export type { ToggleProps } from './toggle'
 export { ToastProvider, useToast } from './toast'
 export type { Toast, ToastTone } from './toast'

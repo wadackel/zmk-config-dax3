@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'hono/jsx'
 import { Button } from '../components/ui/button'
 import { ToastProvider } from '../components/ui/toast'
+import { NavRail } from '../components/editor/nav-rail'
 import { EditorProvider, useEditor } from '../lib/editor-state/context'
 import { fetchKeymap } from '../lib/editor-state/io'
 import { ModalStackProvider, useModalStack } from '../lib/editor-state/modal-stack'
@@ -22,6 +23,8 @@ const TABS: { id: EditorTab; label: string }[] = [
   { id: 'sensors', label: 'Sensors' },
   { id: 'mouse-gestures', label: 'Mouse Gestures' },
 ]
+
+const KEYMAP_PATH_LABEL = 'config/dax3.keymap'
 
 function EditorShell() {
   const { state, dispatch } = useEditor()
@@ -108,139 +111,120 @@ function EditorShell() {
 
   if (loading) {
     return (
-      <div class="flex items-center justify-center min-h-screen text-fg-muted">
+      <div class="flex-1 min-h-0 flex items-center justify-center text-fg-muted">
         Loading keymap…
       </div>
     )
   }
   if (loadError) {
     return (
-      <div class="flex items-center justify-center min-h-screen text-danger p-8">
+      <div class="flex-1 min-h-0 flex items-center justify-center text-danger p-8">
         {loadError}
       </div>
     )
   }
 
   const dirty = state.past.length > 0
+  const activeLabel = TABS.find((t) => t.id === state.activeTab)?.label ?? ''
+
+  const focusTab = (id: EditorTab) => {
+    dispatch({ type: 'SET_ACTIVE_TAB', tab: id })
+    queueMicrotask(() => {
+      const el = document.querySelector<HTMLButtonElement>(
+        `[data-editor-tab="${id}"]`,
+      )
+      el?.focus()
+    })
+  }
+
+  const onRailKeyDown = (e: KeyboardEvent) => {
+    if (
+      e.key !== 'ArrowUp' &&
+      e.key !== 'ArrowDown' &&
+      e.key !== 'Home' &&
+      e.key !== 'End'
+    ) {
+      return
+    }
+    e.preventDefault()
+    const currentIdx = TABS.findIndex((t) => t.id === state.activeTab)
+    const last = TABS.length - 1
+    let nextIdx = currentIdx
+    if (e.key === 'ArrowUp') nextIdx = currentIdx <= 0 ? last : currentIdx - 1
+    else if (e.key === 'ArrowDown') nextIdx = currentIdx >= last ? 0 : currentIdx + 1
+    else if (e.key === 'Home') nextIdx = 0
+    else if (e.key === 'End') nextIdx = last
+    const target = TABS[nextIdx]
+    if (target) focusTab(target.id)
+  }
 
   return (
-    <div class="flex-1 min-h-0 flex flex-col bg-surface-0 text-fg">
-      <header class="border-b border-border-subtle px-4 py-3 flex items-center justify-between gap-4">
-        <div class="flex items-center gap-4 min-w-0">
-          <a
-            href="/tester"
-            class="text-fg-subtle hover:text-fg text-sm transition-colors"
-          >
-            ← Tester
-          </a>
-          <h1 class="text-base font-semibold m-0 tracking-tight">Keymap Editor</h1>
-          <span class="text-[10px] uppercase tracking-wider text-fg-subtle border border-border rounded-full px-1.5 py-0.5">
-            dev
-          </span>
-          {dirty && (
-            <span
-              class="inline-flex items-center gap-1.5 text-xs text-warning"
-              aria-live="polite"
-              title="You have unsaved edits"
+    <div class="flex-1 min-h-0 flex bg-surface-0 text-fg overflow-hidden">
+      <NavRail
+        items={TABS}
+        active={state.activeTab}
+        onSelect={(id) => dispatch({ type: 'SET_ACTIVE_TAB', tab: id })}
+        configPath={KEYMAP_PATH_LABEL}
+        testerHref="/tester"
+        onKeyDown={onRailKeyDown}
+      />
+
+      <div class="flex-1 min-w-0 flex flex-col">
+        <header class="border-b border-border-subtle px-6 py-3.5 flex items-center justify-between gap-4">
+          <div class="flex items-baseline gap-3 min-w-0">
+            <h1 class="text-[17px] font-bold m-0 tracking-tight">{activeLabel}</h1>
+            <span class="text-xs font-mono text-fg-subtle">dax3 · 46 keys</span>
+            {dirty && (
+              <span
+                class="inline-flex items-center gap-1.5 text-xs text-warning"
+                aria-live="polite"
+                title="You have unsaved edits"
+              >
+                <span class="inline-block w-1.5 h-1.5 rounded-full bg-warning" />
+                Unsaved
+              </span>
+            )}
+          </div>
+          <div class="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={state.past.length === 0}
+              onClick={() => dispatch({ type: 'UNDO' })}
+              title="Undo (⌘Z / Ctrl+Z)"
             >
-              <span class="inline-block w-1.5 h-1.5 rounded-full bg-warning" />
-              Unsaved changes
-            </span>
-          )}
-        </div>
-        <div class="flex items-center gap-1.5">
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={state.past.length === 0}
-            onClick={() => dispatch({ type: 'UNDO' })}
-            title="Undo (⌘Z / Ctrl+Z)"
-          >
-            ↶ Undo
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={state.future.length === 0}
-            onClick={() => dispatch({ type: 'REDO' })}
-            title="Redo (⌘⇧Z / Ctrl+Y)"
-          >
-            ↷ Redo
-          </Button>
-          <Button size="sm" variant="primary" onClick={() => setSaveDialogOpen(true)}>
-            Save…
-          </Button>
-        </div>
-      </header>
-      <nav
-        class="flex border-b border-border-subtle px-1"
-        role="tablist"
-        aria-label="Editor sections"
-        onKeyDown={(e: KeyboardEvent) => {
-          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Home' && e.key !== 'End') {
-            return
-          }
-          e.preventDefault()
-          const currentIdx = TABS.findIndex((t) => t.id === state.activeTab)
-          const last = TABS.length - 1
-          let nextIdx = currentIdx
-          if (e.key === 'ArrowLeft') nextIdx = currentIdx <= 0 ? last : currentIdx - 1
-          else if (e.key === 'ArrowRight') nextIdx = currentIdx >= last ? 0 : currentIdx + 1
-          else if (e.key === 'Home') nextIdx = 0
-          else if (e.key === 'End') nextIdx = last
-          const target = TABS[nextIdx]
-          if (!target) return
-          dispatch({ type: 'SET_ACTIVE_TAB', tab: target.id })
-          // Focus the newly-active tab so subsequent Arrow keys keep working.
-          queueMicrotask(() => {
-            const el = document.querySelector<HTMLButtonElement>(
-              `[data-editor-tab="${target.id}"]`,
-            )
-            el?.focus()
-          })
-        }}
-      >
-        {TABS.map((t) => {
-          const active = state.activeTab === t.id
-          return (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              id={`tab-${t.id}`}
-              data-editor-tab={t.id}
-              // Serialize to string — hono/jsx renders boolean aria attributes
-              // as empty-string values, which screen readers do not treat as
-              // the truthful state ("true"/"false" is what APG expects).
-              aria-selected={active ? 'true' : 'false'}
-              aria-controls={`tabpanel-${t.id}`}
-              tabIndex={active ? 0 : -1}
-              class={[
-                'px-3.5 py-2 text-sm transition-colors relative',
-                active
-                  ? 'text-fg after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-t after:bg-accent'
-                  : 'text-fg-muted hover:text-fg',
-              ].join(' ')}
-              onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', tab: t.id })}
+              ↶ Undo
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={state.future.length === 0}
+              onClick={() => dispatch({ type: 'REDO' })}
+              title="Redo (⌘⇧Z / Ctrl+Y)"
             >
-              {t.label}
-            </button>
-          )
-        })}
-      </nav>
-      <main
-        class="flex-1 flex flex-col min-h-0 p-4 overflow-auto"
-        role="tabpanel"
-        id={`tabpanel-${state.activeTab}`}
-        aria-labelledby={`tab-${state.activeTab}`}
-      >
-        {state.activeTab === 'layers' && <LayersTab />}
-        {state.activeTab === 'combos' && <CombosTab />}
-        {state.activeTab === 'macros' && <MacrosTab />}
-        {state.activeTab === 'behaviors' && <BehaviorsTab />}
-        {state.activeTab === 'sensors' && <SensorsTab />}
-        {state.activeTab === 'mouse-gestures' && <MouseGesturesTab />}
-      </main>
+              ↷ Redo
+            </Button>
+            <Button size="sm" variant="primary" onClick={() => setSaveDialogOpen(true)}>
+              Save…
+            </Button>
+          </div>
+        </header>
+
+        <main
+          class="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden"
+          role="tabpanel"
+          id={`tabpanel-${state.activeTab}`}
+          aria-labelledby={`tab-${state.activeTab}`}
+        >
+          {state.activeTab === 'layers' && <LayersTab />}
+          {state.activeTab === 'combos' && <CombosTab />}
+          {state.activeTab === 'macros' && <MacrosTab />}
+          {state.activeTab === 'behaviors' && <BehaviorsTab />}
+          {state.activeTab === 'sensors' && <SensorsTab />}
+          {state.activeTab === 'mouse-gestures' && <MouseGesturesTab />}
+        </main>
+      </div>
+
       {saveDialogOpen && <SaveDialog onClose={() => setSaveDialogOpen(false)} />}
     </div>
   )

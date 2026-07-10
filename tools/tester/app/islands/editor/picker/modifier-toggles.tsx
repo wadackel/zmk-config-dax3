@@ -87,10 +87,10 @@ function ModButton({
       type="button"
       aria-pressed={active ? 'true' : 'false'}
       data-modwrap={wrap}
-      class={`px-2 py-0.5 rounded text-[11px] border font-mono ${
+      class={`px-2 py-0.5 rounded-md text-[11px] border font-mono ${
         active
-          ? 'bg-blue-600 text-fg border-blue-400'
-          : 'bg-surface-3 text-fg-muted border-border-strong hover:border-zinc-500'
+          ? 'bg-accent text-accent-fg border-accent'
+          : 'bg-surface-0 text-fg-muted border-border hover:border-border-strong'
       }`}
       onClick={onToggle}
     >

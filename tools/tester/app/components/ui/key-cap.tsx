@@ -7,16 +7,22 @@ import type { Child, JSX } from 'hono/jsx'
  * the same way in either context.
  */
 export type KeyCapState =
-  /** Default — neutral cell. */
+  /** Default — neutral `&kp` cell (white). */
   | 'idle'
-  /** Hovered in the Editor edit mode (accent border). */
+  /** Behaviour tap variant — `&mt` / `&mo` / `&lt` (off-white). */
+  | 'mod'
+  /** `&trans` / `&none` placeholder — dashed outline. */
+  | 'trans'
+  /** Hovered in Editor edit mode. */
   | 'hover'
-  /** Selected as a paste target in the Editor copy mode. */
+  /** Selected as an edit target (Inspector focused this cell). */
   | 'selected'
-  /** Copy-mode hover, clipboard has content — success border. */
+  /** Copy-mode paste target (multi-select). */
   | 'clip-target'
-  /** Copy-mode hover, clipboard empty — warning border to hint "pick source". */
+  /** Copy-mode hover with empty clipboard — needs a source pick. */
   | 'clip-source'
+  /** Highlighted as part of the active Combo's key positions. */
+  | 'combo-target'
   /** Tester: not yet exercised. */
   | 'tester-idle'
   /** Tester: successfully tested. */
@@ -33,25 +39,36 @@ export type KeyCapState =
 // `absolute` (Tester cells, positioned via left/top style props). Adding
 // `relative` here made `absolute` in the caller's class lose the Tailwind
 // class-order tiebreaker, collapsing the Tester grid into normal flow.
+//
+// `aspect-square` enforces 1:1 explicitly so parent flex containers that
+// try to stretch cells (Combos board pick-mode grid, e.g.) cannot distort
+// the cap regardless of the surrounding layout.
 const BASE =
-  'w-16 h-16 flex flex-col items-center justify-center rounded-md border font-mono px-1 leading-tight text-center break-words transition-[colors,box-shadow,transform] duration-150 select-none'
+  'w-14 h-14 aspect-square flex flex-col items-center justify-center rounded-lg border font-mono px-1 leading-tight text-center break-words transition-[colors,box-shadow,transform] duration-150 select-none'
 
 const VARIANT: Record<KeyCapState, string> = {
-  idle: 'bg-surface-3 border-border text-fg',
-  hover: 'bg-surface-4 border-accent text-fg',
+  idle:
+    'bg-[color:var(--color-keycap-idle)] border-border text-fg shadow-[var(--shadow-key)]',
+  mod: 'bg-[color:var(--color-keycap-mod)] border-border text-fg shadow-[var(--shadow-key)]',
+  trans:
+    'bg-[color:var(--color-keycap-trans)] border-dashed border-[color:var(--color-border-strong)] text-[color:var(--color-keycap-trans-fg)]',
+  hover:
+    'bg-[color:var(--color-keycap-idle)] border-[color:var(--color-border-strong)] text-fg shadow-[var(--shadow-key-hover)] -translate-y-px',
   selected:
-    'bg-success-soft border-success ring-1 ring-success/60 text-fg shadow-[0_0_10px_rgb(16_185_129/0.25)]',
+    'bg-accent-soft border-2 border-accent text-fg shadow-[var(--shadow-focus-ring)]',
   'clip-target':
-    'bg-surface-4 border-success text-fg shadow-[0_0_10px_rgb(16_185_129/0.35)]',
+    'bg-accent-soft border-2 border-accent text-fg shadow-[var(--shadow-focus-ring)]',
   'clip-source':
-    'bg-surface-4 border-warning text-fg shadow-[0_0_10px_rgb(245_158_11/0.25)]',
-  'tester-idle': 'bg-surface-3 border-border text-fg-muted',
+    'bg-warning-soft border-2 border-warning text-fg shadow-[0_0_0_3px_rgb(176_125_28/0.16)]',
+  'combo-target':
+    'bg-[rgb(79_91_107/0.12)] border-2 border-accent text-accent shadow-[0_0_0_3px_rgb(79_91_107/0.14)]',
+  'tester-idle': 'bg-surface-2 border-border text-fg-muted',
   'tester-tested':
-    'bg-accent-soft border-accent text-fg shadow-[0_0_12px_rgb(59_130_246/0.5)]',
+    'bg-accent-soft border-accent text-fg shadow-[0_0_12px_rgb(79_91_107/0.35)]',
   'tester-pressed':
-    'bg-accent border-accent text-accent-fg shadow-[0_0_18px_rgb(59_130_246/0.75)] scale-[1.02]',
+    'bg-accent border-accent text-accent-fg shadow-[0_0_18px_rgb(79_91_107/0.5)] scale-[1.02]',
   'tester-error':
-    'bg-danger-soft border-danger text-fg shadow-[0_0_12px_rgb(239_68_68/0.5)]',
+    'bg-danger-soft border-danger text-fg shadow-[0_0_12px_rgb(224_82_77/0.4)]',
   'tester-untestable':
     'bg-[repeating-linear-gradient(45deg,var(--color-surface-2),var(--color-surface-2)_6px,var(--color-surface-3)_6px,var(--color-surface-3)_10px)] border-border text-fg-subtle',
 }
@@ -109,7 +126,8 @@ export function KeyCap({
   onMouseLeave,
   children,
 }: KeyCapProps) {
-  const hoverClass = hoverable && !disabled ? 'hover:bg-surface-4 cursor-pointer' : ''
+  const hoverClass =
+    hoverable && !disabled ? 'hover:shadow-[var(--shadow-key-hover)] cursor-pointer' : ''
   const interactiveClass = interactive && !disabled ? 'active:scale-[0.98]' : ''
   const composedClass = [BASE, VARIANT[state], hoverClass, interactiveClass, className || '']
     .join(' ')

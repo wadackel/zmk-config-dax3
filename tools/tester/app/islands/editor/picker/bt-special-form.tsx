@@ -66,7 +66,7 @@ export function BtSpecialForm({ tokens, onChange }: Props) {
         per-option DOM creation and survives the append order.
       */}
       <select
-        class="w-full bg-surface-3 border border-border-strong rounded px-2 py-1 text-fg"
+        class="w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg"
         onChange={(e: Event) => {
           const v = (e.target as HTMLSelectElement).value as OptionValue
           onChange(btOptionToTokens(v))

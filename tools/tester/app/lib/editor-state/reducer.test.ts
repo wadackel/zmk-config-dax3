@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BindingChain, LayerData } from '../keymap-dt/types'
-import { emptyDraft, initialState, reducer } from './reducer'
+import { computeMoveMap, emptyDraft, initialState, reducer, remapLayerRefs } from './reducer'
 import type { EditorDraft, EditorState } from './types'
 
 function makeLayer(name: string, fill: BindingChain): LayerData {
@@ -485,4 +485,169 @@ describe('editor reducer', () => {
     expect(after.activeLayerIdx).toBe(1)
   })
 
+  describe('computeMoveMap', () => {
+    it('identity map when from === to', () => {
+      expect(computeMoveMap(1, 1, 4)).toEqual([0, 1, 2, 3])
+    })
+
+    it('forward move shifts intermediate indices down by 1', () => {
+      // [A B C D E], move 1 → 3 → resulting order [A C D B E]
+      // Old index 1 (B) should now be at slot 3; old 2 (C) → 1; old 3 (D) → 2.
+      expect(computeMoveMap(1, 3, 5)).toEqual([0, 3, 1, 2, 4])
+    })
+
+    it('backward move shifts intermediate indices up by 1', () => {
+      // [A B C D E], move 3 → 1 → resulting order [A D B C E]
+      // Old 3 → 1; old 1 → 2; old 2 → 3.
+      expect(computeMoveMap(3, 1, 5)).toEqual([0, 2, 3, 1, 4])
+    })
+
+    it('rejects out-of-range indices with identity fallback', () => {
+      expect(computeMoveMap(5, 2, 3)).toEqual([0, 1, 2])
+      expect(computeMoveMap(0, -1, 3)).toEqual([0, 1, 2])
+    })
+  })
+
+  describe('remapLayerRefs', () => {
+    it('rewrites &mo / &lt argument by the map', () => {
+      const draft: EditorDraft = {
+        ...emptyDraft(),
+        layers: [
+          {
+            name: 'A',
+            bindings: [{ tokens: ['&mo', '1'] }, { tokens: ['&lt', '2', 'ESC'] }],
+            sensorBindings: null,
+          },
+        ],
+        combos: [
+          {
+            name: 'c',
+            bindings: { tokens: ['&mo', '2'] },
+            keyPositions: [0, 1],
+            layers: [1, 2],
+          },
+        ],
+      }
+      const map = [0, 3, 1, 2] // 1 → 3, 2 → 1, 3 → 2
+      const remapped = remapLayerRefs(draft, map)
+      expect(remapped.layers[0].bindings[0].tokens).toEqual(['&mo', '3'])
+      expect(remapped.layers[0].bindings[1].tokens).toEqual(['&lt', '1', 'ESC'])
+      expect(remapped.combos[0].bindings.tokens).toEqual(['&mo', '1'])
+      expect(remapped.combos[0].layers).toEqual([3, 1])
+    })
+
+    it('leaves non-numeric layer-tap args untouched', () => {
+      const draft: EditorDraft = {
+        ...emptyDraft(),
+        layers: [
+          {
+            name: 'A',
+            bindings: [{ tokens: ['&lt', 'SYM_LAYER', 'ESC'] }],
+            sensorBindings: null,
+          },
+        ],
+      }
+      const remapped = remapLayerRefs(draft, [0, 1, 2])
+      expect(remapped.layers[0].bindings[0].tokens).toEqual(['&lt', 'SYM_LAYER', 'ESC'])
+    })
+  })
+
+  describe('MOVE_LAYER', () => {
+    // MOVE_LAYER never lets either endpoint be idx 0 (default_layer is
+    // codegen-locked). Tests below use a 3-layer state and swap between
+    // idx 1 and idx 2 instead of ever touching idx 0.
+    const make3LayerState = (): EditorState => {
+      const draft: EditorDraft = {
+        ...emptyDraft(),
+        layers: [
+          makeLayer('default_layer', { tokens: ['&trans'] }),
+          makeLayer('Symbol', { tokens: ['&trans'] }),
+          makeLayer('Num', { tokens: ['&trans'] }),
+        ],
+      }
+      return { ...initialState(), draft, baselineSource: '', baselineMtimeMs: 0 }
+    }
+
+    it('reorders layers array and updates &mo references', () => {
+      let s = make3LayerState()
+      s = reducer(s, {
+        type: 'UPDATE_BINDING',
+        layerIdx: 0,
+        keyIdx: 0,
+        chain: { tokens: ['&mo', '1'] },
+      })
+      // Move Symbol (idx 1) to slot 2 — Num shifts left.
+      s = reducer(s, { type: 'MOVE_LAYER', fromIdx: 1, toIdx: 2 })
+      expect(s.draft.layers.map((l) => l.name)).toEqual([
+        'default_layer',
+        'Num',
+        'Symbol',
+      ])
+      // The &mo 1 reference on default_layer should now be &mo 2
+      // (Symbol moved to slot 2, so references to old index 1 → new 2).
+      expect(s.draft.layers[0].bindings[0].tokens).toEqual(['&mo', '2'])
+      expect(s.past.length).toBe(2) // one from UPDATE_BINDING, one from MOVE
+    })
+
+    it('MOVE_LAYER with same from/to is a no-op', () => {
+      const s = makeState()
+      const after = reducer(s, { type: 'MOVE_LAYER', fromIdx: 1, toIdx: 1 })
+      expect(after).toBe(s)
+    })
+
+    it('adjusts activeLayerIdx to follow the moved layer', () => {
+      let s = make3LayerState()
+      s = { ...s, activeLayerIdx: 1 }
+      s = reducer(s, { type: 'MOVE_LAYER', fromIdx: 1, toIdx: 2 })
+      expect(s.activeLayerIdx).toBe(2)
+    })
+  })
+
+  describe('RENAME_LAYER', () => {
+    it('changes only the target layer name', () => {
+      let s = makeState()
+      s = reducer(s, { type: 'RENAME_LAYER', idx: 1, name: 'Sym' })
+      expect(s.draft.layers[1].name).toBe('Sym')
+      expect(s.draft.layers[0].name).toBe('default_layer')
+      expect(s.past.length).toBe(1)
+    })
+
+    it('rejects a duplicate name silently', () => {
+      const s = makeState()
+      const after = reducer(s, { type: 'RENAME_LAYER', idx: 1, name: 'default_layer' })
+      expect(after).toBe(s)
+    })
+
+    it('rejects an empty / whitespace-only name', () => {
+      const s = makeState()
+      expect(reducer(s, { type: 'RENAME_LAYER', idx: 1, name: '  ' })).toBe(s)
+    })
+
+    it('rejects renaming idx 0 (default_layer is codegen-locked)', () => {
+      const s = makeState()
+      const after = reducer(s, { type: 'RENAME_LAYER', idx: 0, name: 'Base' })
+      expect(after).toBe(s)
+    })
+
+    it('rejects invalid DT identifier (spaces, leading digit, punctuation)', () => {
+      const s = makeState()
+      expect(reducer(s, { type: 'RENAME_LAYER', idx: 1, name: 'my layer' })).toBe(s)
+      expect(reducer(s, { type: 'RENAME_LAYER', idx: 1, name: '9num' })).toBe(s)
+      expect(reducer(s, { type: 'RENAME_LAYER', idx: 1, name: 'has-dash' })).toBe(s)
+    })
+  })
+
+  describe('MOVE_LAYER default_layer guard', () => {
+    it('rejects MOVE_LAYER when fromIdx is 0', () => {
+      const s = makeState()
+      const after = reducer(s, { type: 'MOVE_LAYER', fromIdx: 0, toIdx: 1 })
+      expect(after).toBe(s)
+    })
+
+    it('rejects MOVE_LAYER when toIdx is 0', () => {
+      const s = makeState()
+      const after = reducer(s, { type: 'MOVE_LAYER', fromIdx: 1, toIdx: 0 })
+      expect(after).toBe(s)
+    })
+  })
 })

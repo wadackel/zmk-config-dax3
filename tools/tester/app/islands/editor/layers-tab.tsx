@@ -1,53 +1,39 @@
-import { useEffect, useRef, useState } from 'hono/jsx'
-import { Button } from '../../components/ui/button'
-import { Dialog } from '../../components/ui/dialog'
-import { Field, TextInput } from '../../components/ui/field'
+import { useEffect, useState } from 'hono/jsx'
 import { KeyCap } from '../../components/ui/key-cap'
 import type { KeyCapState } from '../../components/ui/key-cap'
 import { useEditor } from '../../lib/editor-state/context'
-import { countLayerRefs } from '../../lib/editor-state/reducer'
 import { KEYS } from '../../lib/layout'
 import { KeyboardGrid } from '../../components/keyboard-grid'
 import type { BindingChain } from '../../lib/keymap-dt/types'
 import { formatBindingForCell, mainLineSizeClass } from '../../lib/binding-display'
-import { BindingPicker } from './binding-picker'
+import { BindingInspector } from './inspector/binding-inspector'
+import { LayerList } from './layers/layer-list'
 
-const DT_IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/
-
-// Monotonic per-mount token. Each LayersTab instance grabs the next value on
-// mount; window listeners installed by that instance compare against
-// `currentLayersInstance` before running. When hono/jsx skips useEffect
-// cleanup on conditional unmount (tab switch), the old listener stays in
-// memory but its captured token no longer matches, so subsequent Cmd+C /
-// Cmd+V events on a re-mounted Layers tab only reach the newest closure.
+// Monotonic per-mount token. Each LayersTab instance grabs the next value
+// from a lazy useState initializer (see below) so incrementing does not
+// happen inside a bare render body. Window listeners installed by that
+// instance compare against `currentLayersInstance` before running: when
+// hono/jsx skips useEffect cleanup on conditional unmount (tab switch),
+// the old listener stays in memory but its captured token no longer
+// matches, so subsequent Cmd+C / Cmd+V events on a re-mounted Layers tab
+// only reach the newest closure.
 let layersInstanceCounter = 0
 let currentLayersInstance = 0
 
 type ContextMenuState = { x: number; y: number; keyIdx: number } | null
 type EditMode = 'edit' | 'copy'
-type LayerDialogState = { kind: 'add' } | { kind: 'remove'; idx: number } | null
 
 export function LayersTab() {
   const { state, dispatch } = useEditor()
-  // Claim the next instance token. Every render re-runs this line, but the
-  // ref keeps the same value for the lifetime of THIS mount; on remount a
-  // fresh ref grabs a new token, superseding any listener still bound to
-  // the previous mount's token.
-  const instanceTokenRef = useRef<{ v: number } | null>(null)
-  if (instanceTokenRef.current === null) {
-    layersInstanceCounter++
-    currentLayersInstance = layersInstanceCounter
-    instanceTokenRef.current = { v: layersInstanceCounter }
-  } else {
-    // On re-render (not remount), reassert this instance as current in case
-    // an earlier instance's listener ran and clobbered the value.
-    currentLayersInstance = instanceTokenRef.current.v
-  }
-  const [pickerKeyIdx, setPickerKeyIdx] = useState<number | null>(null)
+  // Lazy initializer keeps the counter increment out of speculative render
+  // paths; the token stays stable across re-renders of the same mount and
+  // a fresh token is only minted when the component actually mounts anew.
+  const [instanceToken] = useState(() => ++layersInstanceCounter)
+  currentLayersInstance = instanceToken
+  const [selectedKeyIdx, setSelectedKeyIdx] = useState<number | null>(null)
   const [hoveredKeyIdx, setHoveredKeyIdx] = useState<number | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null)
   const [mode, setMode] = useState<EditMode>('edit')
-  const [layerDialog, setLayerDialog] = useState<LayerDialogState>(null)
   // Paste-target selection used in Copy mode: click toggles membership, then
   // Cmd/Ctrl+V commits a single bulk paste to every selected cell.
   const [selectedKeyIdxs, setSelectedKeyIdxs] = useState<Set<number>>(new Set())
@@ -61,13 +47,12 @@ export function LayersTab() {
       return next
     })
 
-  // Reset selection when leaving Copy mode or switching layers — those changes
-  // invalidate the previous selection context.
   useEffect(() => {
     if (mode === 'edit') clearSelection()
   }, [mode])
   useEffect(() => {
     clearSelection()
+    setSelectedKeyIdx(null)
   }, [state.activeLayerIdx])
 
   const activeLayer = state.draft.layers[state.activeLayerIdx]
@@ -109,30 +94,18 @@ export function LayersTab() {
     clearSelection()
   }
 
-  // Global keyboard shortcuts: Cmd/Ctrl+C / Cmd/Ctrl+V on the hovered cell.
-  // Suppressed when a modal / context menu is open or any text input has focus —
-  // those cases belong to native browser copy/paste.
   useEffect(() => {
-    const myToken = instanceTokenRef.current?.v ?? -1
+    const myToken = instanceToken
     const onKey = (e: KeyboardEvent) => {
-      // Two-layer stale-listener defence, both needed because hono/jsx skips
-      // useEffect cleanup on conditional unmount (tab switch):
-      //   1. Bail when Layers is not the current active tab.
-      //   2. Bail when this listener belongs to an older LayersTab mount
-      //      (Layers → Combos → Layers spawns a new instance; the previous
-      //      listener would otherwise race the new one on the same event).
       if (myToken !== currentLayersInstance) return
       const layersActive = document
         .querySelector<HTMLElement>('[role="tab"][data-editor-tab="layers"]')
         ?.getAttribute('aria-selected') === 'true'
       if (!layersActive) return
-      // Esc routing: 1st priority = drop a non-empty selection; 2nd = exit Copy
-      // mode. Modals / context menus own Esc when they're up.
       if (
         e.key === 'Escape' &&
-        pickerKeyIdx === null &&
-        contextMenu === null &&
-        layerDialog === null
+        selectedKeyIdx === null &&
+        contextMenu === null
       ) {
         if (selectedKeyIdxs.size > 0) {
           e.preventDefault()
@@ -145,15 +118,21 @@ export function LayersTab() {
           return
         }
       }
+      // Esc while Inspector is open closes the Inspector — the Inspector
+      // itself only intercepts Cmd+Enter, so top-level Esc lives here.
+      if (e.key === 'Escape' && selectedKeyIdx !== null) {
+        e.preventDefault()
+        setSelectedKeyIdx(null)
+        return
+      }
       if (!(e.metaKey || e.ctrlKey)) return
       if (e.key !== 'c' && e.key !== 'v') return
-      if (pickerKeyIdx !== null || contextMenu !== null || layerDialog !== null) return
+      if (contextMenu !== null) return
       const ae = document.activeElement as HTMLElement | null
       if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) {
         return
       }
       if (e.key === 'v') {
-        // Selection wins over hover: deliberate multi-target paste.
         if (state.clipboard && selectedKeyIdxs.size > 0) {
           e.preventDefault()
           pasteToSelection()
@@ -172,22 +151,31 @@ export function LayersTab() {
     return () => window.removeEventListener('keydown', onKey)
   }, [
     hoveredKeyIdx,
-    pickerKeyIdx,
+    selectedKeyIdx,
     contextMenu,
-    layerDialog,
     state.clipboard,
     state.activeLayerIdx,
+    // `state.draft.layers` reference changes after Undo/Redo/SAVE_COMMIT/LOAD;
+    // without it the effect keeps a closure over the pre-Undo bindings, so
+    // Undo → hover → Cmd+C copies the wrong (post-Undo) draft's value.
+    state.draft.layers,
     mode,
     selectedKeyIdxs,
+    instanceToken,
   ])
 
-  // Close the floating context menu on any outside click / Esc / scroll.
   useEffect(() => {
     if (!contextMenu) return
-    const myToken = instanceTokenRef.current?.v ?? -1
-    const close = () => setContextMenu(null)
+    const myToken = instanceToken
+    // Same instance-token guard as the copy/paste keydown listener above:
+    // hono/jsx skipping cleanup on conditional unmount would otherwise leak
+    // these mousedown / scroll listeners across tab switches and let stale
+    // closures fire against a re-mounted LayersTab.
+    const close = () => {
+      if (myToken !== currentLayersInstance) return
+      setContextMenu(null)
+    }
     const onKey = (e: KeyboardEvent) => {
-      // Same stale-listener guards as the copy/paste hotkey block above.
       if (myToken !== currentLayersInstance) return
       const layersActive = document
         .querySelector<HTMLElement>('[role="tab"][data-editor-tab="layers"]')
@@ -203,180 +191,140 @@ export function LayersTab() {
       document.removeEventListener('scroll', close, true)
       window.removeEventListener('keydown', onKey)
     }
-  }, [contextMenu])
+  }, [contextMenu, instanceToken])
 
   if (state.draft.layers.length === 0) {
     return <div class="text-fg-subtle text-sm">No layers loaded.</div>
   }
 
-  const onPickerCommit = (chain: BindingChain) => {
-    if (pickerKeyIdx === null) return
-    dispatch({
-      type: 'UPDATE_BINDING',
-      layerIdx: state.activeLayerIdx,
-      keyIdx: pickerKeyIdx,
-      chain,
-    })
-    setPickerKeyIdx(null)
-  }
-
   const clipboardPreview = state.clipboard?.tokens.join(' ') ?? ''
 
+  const onKeyCellClick = (keyIdx: number) => {
+    if (mode === 'copy') {
+      if (state.clipboard === null) doCopy(keyIdx)
+      else toggleSelected(keyIdx)
+    } else {
+      setSelectedKeyIdx(keyIdx)
+    }
+  }
+
   return (
-    <div class="grid grid-rows-[auto_1fr] gap-4 h-full min-h-0">
-      <div class="flex gap-1.5 flex-wrap items-center">
-        {state.draft.layers.map((l, i) => (
-          <div key={l.name} class="flex items-stretch">
-            <button
-              type="button"
-              class={[
-                'px-3 py-1 rounded-l-md text-xs transition-colors',
-                state.activeLayerIdx === i
-                  ? 'bg-accent text-accent-fg'
-                  : 'bg-surface-3 text-fg-muted hover:bg-surface-4 hover:text-fg',
-                i === 0 ? 'rounded-r-md' : '',
-              ].join(' ')}
-              onClick={() => dispatch({ type: 'SET_ACTIVE_LAYER', layerIdx: i })}
-            >
-              <span class="text-fg-subtle mr-1">{i}</span>
-              <span class="font-mono">{l.name}</span>
-            </button>
-            {i !== 0 && (
-              <button
-                type="button"
-                title={`Remove layer ${l.name}`}
-                aria-label={`Remove layer ${l.name}`}
-                class="px-2 rounded-r-md text-xs bg-surface-3 text-fg-subtle hover:bg-danger hover:text-danger-fg border-l border-surface-0 transition-colors"
-                onClick={() => setLayerDialog({ kind: 'remove', idx: i })}
-              >
-                ×
-              </button>
-            )}
-          </div>
-        ))}
-        <Button
-          size="xs"
-          variant="ghost"
-          class="border-dashed"
-          onClick={() => setLayerDialog({ kind: 'add' })}
-        >
-          + Add layer
-        </Button>
-      </div>
+    <div class="flex-1 min-h-0 min-w-0 flex bg-surface-0">
+      <LayerList />
 
-      <div class="flex items-start justify-center overflow-auto min-h-0 min-w-0 pt-8">
-        <KeyboardGrid
-          keys={KEYS}
-          renderCell={(k) => {
-            const binding = activeLayer.bindings[k.index]
-            const display = binding
-              ? formatBindingForCell(binding)
-              : { topLine: '', mainLine: '', faint: true }
-            const isHovered = hoveredKeyIdx === k.index
-            const isSelected = selectedKeyIdxs.has(k.index)
-            const capState: KeyCapState = isSelected
-              ? 'selected'
-              : isHovered
-                ? mode === 'copy'
-                  ? state.clipboard
-                    ? 'clip-target'
-                    : 'clip-source'
-                  : 'hover'
-                : 'idle'
-            const mainColor = display.faint ? 'text-fg-subtle' : 'text-fg'
-            return (
-              <KeyCap
-                state={capState}
-                asButton
-                hoverable
-                interactive
-                class="relative"
-                title={binding ? binding.tokens.join(' ') : ''}
-                onClick={() => {
-                  if (mode === 'copy') {
-                    if (state.clipboard === null) doCopy(k.index)
-                    else toggleSelected(k.index)
-                  } else {
-                    setPickerKeyIdx(k.index)
-                  }
-                }}
-                onMouseEnter={() => setHoveredKeyIdx(k.index)}
-                onMouseLeave={() => setHoveredKeyIdx((cur) => (cur === k.index ? null : cur))}
-                onContextMenu={(e: MouseEvent) => {
-                  e.preventDefault()
-                  setContextMenu({ x: e.clientX, y: e.clientY, keyIdx: k.index })
-                }}
-              >
-                {display.topLine && (
-                  <span class="absolute top-0.5 inset-x-1 text-[8px] text-fg-subtle leading-none truncate text-left">
-                    {display.topLine}
-                  </span>
-                )}
-                <span class={`${mainLineSizeClass(display.mainLine)} ${mainColor}`}>
-                  {display.mainLine}
-                </span>
-                {display.subLine && (
-                  <span class="absolute bottom-0.5 inset-x-1 text-[8px] text-fg-subtle leading-none truncate">
-                    {display.subLine}
-                  </span>
-                )}
-              </KeyCap>
-            )
-          }}
+      <div class="flex-1 bg-surface-3 flex flex-col min-w-0 overflow-auto">
+        <BoardHeader
+          layerName={activeLayer.name}
+          layerIdx={state.activeLayerIdx}
+          mode={mode}
+          onToggleMode={() => setMode((m) => (m === 'copy' ? 'edit' : 'copy'))}
+          clipboardPreview={clipboardPreview}
+          selectedCount={selectedKeyIdxs.size}
+          onClearClipboard={() => dispatch({ type: 'SET_CLIPBOARD', chain: null })}
         />
+
+        <div class="flex-1 flex items-start justify-center px-8 pt-4 pb-10 min-w-0">
+          <KeyboardGrid
+            keys={KEYS}
+            renderCell={(k) => {
+              const binding = activeLayer.bindings[k.index]
+              const display = binding
+                ? formatBindingForCell(binding)
+                : { topLine: '', mainLine: '', faint: true }
+              const isHovered = hoveredKeyIdx === k.index
+              const isCopySelected = selectedKeyIdxs.has(k.index)
+              const isEditSelected = selectedKeyIdx === k.index
+              const isTrans =
+                binding && binding.tokens.length === 1 && binding.tokens[0] === '&trans'
+              const isMod =
+                binding &&
+                binding.tokens.length > 0 &&
+                binding.tokens[0].startsWith('&') &&
+                binding.tokens[0] !== '&kp' &&
+                binding.tokens[0] !== '&trans' &&
+                binding.tokens[0] !== '&none'
+              const capState: KeyCapState = isEditSelected
+                ? 'selected'
+                : isCopySelected
+                  ? 'clip-target'
+                  : isHovered
+                    ? mode === 'copy'
+                      ? state.clipboard
+                        ? 'clip-target'
+                        : 'clip-source'
+                      : 'hover'
+                    : isTrans
+                      ? 'trans'
+                      : isMod
+                        ? 'mod'
+                        : 'idle'
+              const mainColor = display.faint ? 'text-fg-subtle' : 'text-fg'
+              return (
+                <KeyCap
+                  state={capState}
+                  asButton
+                  hoverable
+                  interactive
+                  class="relative"
+                  title={binding ? binding.tokens.join(' ') : ''}
+                  onClick={() => onKeyCellClick(k.index)}
+                  onMouseEnter={() => setHoveredKeyIdx(k.index)}
+                  onMouseLeave={() => setHoveredKeyIdx((cur) => (cur === k.index ? null : cur))}
+                  onContextMenu={(e: MouseEvent) => {
+                    e.preventDefault()
+                    setContextMenu({ x: e.clientX, y: e.clientY, keyIdx: k.index })
+                  }}
+                >
+                  {display.topLine && (
+                    <span class="absolute top-0.5 inset-x-1 text-[8px] text-fg-subtle leading-none truncate text-left">
+                      {display.topLine}
+                    </span>
+                  )}
+                  <span class={`${mainLineSizeClass(display.mainLine)} ${mainColor}`}>
+                    {display.mainLine}
+                  </span>
+                  {display.subLine && (
+                    <span class="absolute bottom-0.5 inset-x-1 text-[8px] text-fg-subtle leading-none truncate">
+                      {display.subLine}
+                    </span>
+                  )}
+                </KeyCap>
+              )
+            }}
+          />
+        </div>
       </div>
 
-      {pickerKeyIdx !== null && (
-        <BindingPicker
-          initial={activeLayer.bindings[pickerKeyIdx]}
-          onCancel={() => setPickerKeyIdx(null)}
-          onCommit={onPickerCommit}
+      {selectedKeyIdx !== null && activeLayer.bindings[selectedKeyIdx] && (
+        <BindingInspector
+          keyIdx={selectedKeyIdx}
+          initial={activeLayer.bindings[selectedKeyIdx]}
+          onCancel={() => setSelectedKeyIdx(null)}
+          onCommit={(chain) => {
+            dispatch({
+              type: 'UPDATE_BINDING',
+              layerIdx: state.activeLayerIdx,
+              keyIdx: selectedKeyIdx,
+              chain,
+            })
+            setSelectedKeyIdx(null)
+          }}
         />
       )}
 
-      <div class="fixed bottom-4 right-4 z-30 flex flex-col items-end gap-2 pointer-events-none">
-        {state.clipboard && (
-          <div
-            class="pointer-events-auto inline-flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-mono bg-surface-3/95 border border-success/60 text-success shadow-panel backdrop-blur"
-            title="Editor clipboard (Cmd/Ctrl+C on a cell to copy, Cmd/Ctrl+V to paste)"
-          >
-            <span class="uppercase tracking-wide">Clipboard</span>
-            <span class="text-fg">{clipboardPreview}</span>
-            <button
-              type="button"
-              class="text-fg-subtle hover:text-fg"
-              onClick={() => dispatch({ type: 'SET_CLIPBOARD', chain: null })}
-              aria-label="Clear clipboard"
-              title="Clear clipboard"
-            >
-              ×
-            </button>
-          </div>
-        )}
-        <button
-          type="button"
-          class={[
-            'pointer-events-auto px-3 py-2 rounded-md text-xs shadow-panel backdrop-blur transition-colors',
-            mode === 'copy'
-              ? 'bg-success/90 text-fg-inverse hover:bg-success'
-              : 'bg-surface-3/95 border border-border text-fg-muted hover:bg-surface-4 hover:text-fg',
-          ].join(' ')}
-          onClick={() => setMode((m) => (m === 'copy' ? 'edit' : 'copy'))}
-          title={
-            mode === 'copy'
-              ? 'Click to exit copy mode (Esc)'
-              : 'Click cells to copy/paste instead of opening the picker'
-          }
+      {selectedKeyIdx === null && (
+        <aside
+          class="w-[356px] flex-none border-l border-border-subtle bg-surface-1 flex flex-col items-center justify-center p-8 text-center gap-3"
+          aria-label="Binding editor (empty)"
         >
-          {mode === 'copy'
-            ? state.clipboard
-              ? selectedKeyIdxs.size > 0
-                ? `● Copy mode — ⌘V to paste into ${selectedKeyIdxs.size}`
-                : '● Copy mode — click cells to select targets'
-              : '● Copy mode — pick source'
-            : '○ Copy mode'}
-        </button>
-      </div>
+          <span class="text-[13px] font-semibold text-fg-muted">Select a key to edit</span>
+          <span class="text-[11px] text-fg-subtle leading-relaxed">
+            Click a keycap to edit its binding in the Inspector.
+            <br />
+            Copy mode lets you select cells and paste them in bulk.
+          </span>
+        </aside>
+      )}
 
       {contextMenu && (
         <ContextMenu
@@ -385,7 +333,7 @@ export function LayersTab() {
           clipboardPreview={clipboardPreview}
           canPaste={state.clipboard !== null}
           onEdit={() => {
-            setPickerKeyIdx(contextMenu.keyIdx)
+            setSelectedKeyIdx(contextMenu.keyIdx)
             setContextMenu(null)
           }}
           onCopy={() => {
@@ -406,173 +354,114 @@ export function LayersTab() {
           }}
         />
       )}
-
-      {layerDialog?.kind === 'add' && (
-        <AddLayerDialog
-          existingNames={state.draft.layers.map((l) => l.name)}
-          defaultName={`Layer${state.draft.layers.length}`}
-          onCancel={() => setLayerDialog(null)}
-          onConfirm={(name) => {
-            dispatch({ type: 'ADD_LAYER', name })
-            setLayerDialog(null)
-          }}
-        />
-      )}
-      {layerDialog?.kind === 'remove' && state.draft.layers[layerDialog.idx] && (
-        <RemoveLayerDialog
-          idx={layerDialog.idx}
-          layerName={state.draft.layers[layerDialog.idx]!.name}
-          refCount={countLayerRefs(state.draft, layerDialog.idx)}
-          onCancel={() => setLayerDialog(null)}
-          onConfirm={() => {
-            dispatch({ type: 'REMOVE_LAYER', idx: layerDialog.idx })
-            setLayerDialog(null)
-          }}
-        />
-      )}
     </div>
   )
 }
 
-function AddLayerDialog({
-  existingNames,
-  defaultName,
-  onCancel,
-  onConfirm,
-}: {
-  existingNames: string[]
-  defaultName: string
-  onCancel: () => void
-  onConfirm: (name: string) => void
-}) {
-  const [name, setName] = useState(defaultName)
-  const trimmed = name.trim()
-  const inputRef = useRef<HTMLInputElement | null>(null)
-  const invalidIdent = !DT_IDENT.test(trimmed)
-  const duplicate = existingNames.includes(trimmed)
-  const error = !trimmed
-    ? 'Name required.'
-    : invalidIdent
-      ? 'DT identifiers must start with a letter/underscore and contain only letters, digits, underscores.'
-      : duplicate
-        ? `A layer named "${trimmed}" already exists.`
-        : undefined
-  const canSubmit = !error
+type BoardHeaderProps = {
+  layerName: string
+  layerIdx: number
+  mode: EditMode
+  onToggleMode: () => void
+  clipboardPreview: string
+  selectedCount: number
+  onClearClipboard: () => void
+}
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      const el = inputRef.current
-      if (!el) return
-      el.focus()
-      el.select()
-    })
-  }, [])
-
+function BoardHeader({
+  layerName,
+  layerIdx,
+  mode,
+  onToggleMode,
+  clipboardPreview,
+  selectedCount,
+  onClearClipboard,
+}: BoardHeaderProps) {
   return (
-    <Dialog
-      open
-      onClose={onCancel}
-      size="sm"
-      title="Add layer"
-      description="DT identifier used as the layer node name."
-      footer={({ close, runTeardown }) => (
-        <>
-          <Button variant="subtle" onClick={close}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            disabled={!canSubmit}
-            onClick={() => {
-              if (!canSubmit) return
-              runTeardown()
-              onConfirm(trimmed)
-            }}
+    <div class="flex items-center justify-between px-8 pt-4 gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <span class="text-[14px] font-semibold text-fg">{layerName}</span>
+        <span class="text-[11px] font-mono text-fg-subtle">layer {layerIdx}</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <Legend />
+        <span class="w-px h-4 bg-border" aria-hidden="true" />
+        {clipboardPreview && (
+          <span
+            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-success/30 bg-success-soft text-[11.5px] font-mono text-success"
+            title="Editor clipboard — ⌘V to paste"
           >
-            Add layer
-          </Button>
-        </>
-      )}
-    >
-      {({ runTeardown }) => (
-        <Field htmlFor="add-layer-name" label="Name" error={error}>
-          <TextInput
-            id="add-layer-name"
-            ref={inputRef as any}
-            class="font-mono"
-            invalid={!!error && trimmed !== ''}
-            value={name}
-            onInput={(e: Event) => setName((e.target as HTMLInputElement).value)}
-            onKeyDown={(e: KeyboardEvent) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                if (!canSubmit) return
-                // Same reasoning as the Add button — parent's onConfirm sets
-                // layerDialog=null which conditionally unmounts this Dialog;
-                // teardown has to fire synchronously first.
-                runTeardown()
-                onConfirm(trimmed)
-              }
-            }}
+            <span class="uppercase tracking-wide font-semibold">Clip</span>
+            <span class="text-fg">{clipboardPreview}</span>
+            <button
+              type="button"
+              onClick={onClearClipboard}
+              class="text-fg-subtle hover:text-fg"
+              aria-label="Clear clipboard"
+              title="Clear clipboard"
+            >
+              ×
+            </button>
+          </span>
+        )}
+        <button
+          type="button"
+          aria-pressed={mode === 'copy' ? 'true' : 'false'}
+          onClick={onToggleMode}
+          class={[
+            'inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-[12.5px] transition-colors',
+            mode === 'copy'
+              ? 'bg-accent text-accent-fg border-accent shadow-[0_1px_2px_rgb(79_91_107/0.35)]'
+              : 'bg-surface-0 border-border text-fg-muted hover:text-fg hover:bg-surface-2',
+          ].join(' ')}
+          title={
+            mode === 'copy'
+              ? 'Click to exit copy mode (Esc)'
+              : 'Click cells to copy/paste instead of opening the picker'
+          }
+        >
+          <span
+            class={[
+              'w-[11px] h-[11px] border-2 rounded-full inline-block',
+              mode === 'copy' ? 'border-accent-fg' : 'border-fg-subtle',
+            ].join(' ')}
+            aria-hidden="true"
           />
-        </Field>
-      )}
-    </Dialog>
+          {mode === 'copy'
+            ? clipboardPreview
+              ? selectedCount > 0
+                ? `Copy — ⌘V to paste into ${selectedCount}`
+                : 'Copy mode — click cells to select targets'
+              : 'Copy mode — pick source'
+            : 'Copy mode'}
+        </button>
+      </div>
+    </div>
   )
 }
 
-function RemoveLayerDialog({
-  idx,
-  layerName,
-  refCount,
-  onCancel,
-  onConfirm,
-}: {
-  idx: number
-  layerName: string
-  refCount: number
-  onCancel: () => void
-  onConfirm: () => void
-}) {
+/**
+ * Cap-color legend rendered next to the layer name — matches the redesign's
+ * `&kp` / mod / `&trans` swatches so users can decode the board at a glance.
+ */
+function Legend() {
+  const items = [
+    { swatch: 'bg-[color:var(--color-keycap-idle)] border-border', label: '&kp' },
+    { swatch: 'bg-[color:var(--color-keycap-mod)] border-border', label: 'mod / layer-tap' },
+    { swatch: 'bg-[color:var(--color-keycap-trans)] border-dashed border-border-strong', label: '&trans' },
+  ]
   return (
-    <Dialog
-      open
-      onClose={onCancel}
-      size="sm"
-      title={`Remove layer "${layerName}"`}
-      hint="esc to cancel"
-      footer={({ close, runTeardown }) => (
-        <>
-          <Button variant="subtle" onClick={close}>
-            Cancel
-          </Button>
-          <Button
-            variant="danger"
-            onClick={() => {
-              runTeardown()
-              onConfirm()
-            }}
-          >
-            Remove
-          </Button>
-        </>
-      )}
-    >
-      <div class="flex flex-col gap-2 text-sm">
-        <p class="m-0">
-          <span class="text-fg-subtle">Index </span>
-          <span class="font-mono text-fg">{idx}</span>
-          <span class="text-fg-subtle"> · </span>
-          <span class="text-warning">{refCount} reference{refCount === 1 ? '' : 's'}</span>
-          {refCount > 0 && (
-            <span class="text-fg-subtle"> will be replaced with &amp;trans / dropped.</span>
-          )}
-        </p>
-        <p class="text-xs text-fg-subtle m-0">
-          Layer indices &gt; {idx} will shift down by 1.
-        </p>
-      </div>
-    </Dialog>
+    <div class="flex items-center gap-4 text-[11px] text-fg-subtle">
+      {items.map((it) => (
+        <span key={it.label} class="inline-flex items-center gap-2">
+          <span
+            class={['w-3 h-3 rounded-sm border', it.swatch].join(' ')}
+            aria-hidden="true"
+          />
+          {it.label}
+        </span>
+      ))}
+    </div>
   )
 }
 
@@ -602,7 +491,7 @@ function ContextMenu({
   const stop = (e: Event) => e.stopPropagation()
   return (
     <div
-      class="fixed z-40 min-w-[240px] bg-surface-3 border border-border rounded-md shadow-popover py-1 text-xs"
+      class="fixed z-40 min-w-[240px] bg-surface-0 border border-border rounded-lg shadow-popover py-1 text-xs"
       style={`top: ${y}px; left: ${x}px;`}
       onMouseDown={stop}
       onClick={stop}
@@ -610,7 +499,9 @@ function ContextMenu({
     >
       <MenuItem onSelect={onEdit}>Edit binding…</MenuItem>
       <div class="border-t border-border-subtle my-1" />
-      <MenuItem onSelect={onCopy} shortcut="⌘C">Copy binding</MenuItem>
+      <MenuItem onSelect={onCopy} shortcut="⌘C">
+        Copy binding
+      </MenuItem>
       <MenuItem onSelect={onPaste} shortcut="⌘V" disabled={!canPaste}>
         {canPaste ? `Paste — ${clipboardPreview}` : 'Paste (empty)'}
       </MenuItem>
@@ -640,7 +531,7 @@ function MenuItem({
         'w-full flex items-center justify-between gap-4 px-3 py-1.5 text-left',
         disabled
           ? 'text-fg-subtle cursor-not-allowed'
-          : 'text-fg hover:bg-surface-4 cursor-pointer',
+          : 'text-fg hover:bg-surface-2 cursor-pointer',
       ].join(' ')}
       disabled={disabled}
       onClick={() => {

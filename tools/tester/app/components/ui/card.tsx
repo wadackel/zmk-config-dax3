@@ -20,7 +20,7 @@ export function Card({
   return (
     <section
       class={[
-        'bg-surface-2 border border-border rounded-md flex flex-col',
+        'bg-surface-0 border border-border rounded-xl shadow-[var(--shadow-key)] flex flex-col',
         padded ? 'p-4 gap-3' : '',
         className || '',
       ].join(' ')}
