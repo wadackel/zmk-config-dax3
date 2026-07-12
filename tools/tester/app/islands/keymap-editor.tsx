@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'hono/jsx'
 import { Button } from '../components/ui/button'
 import { ToastProvider } from '../components/ui/toast'
-import { NavRail } from '../components/editor/nav-rail'
+import { NavRail, type NavRailItem } from '../components/editor/nav-rail'
+import {
+  BehaviorsIcon,
+  CombosIcon,
+  LayersIcon,
+  MacrosIcon,
+  MouseGesturesIcon,
+  SensorsIcon,
+  TesterIcon,
+} from '../components/editor/nav-icons'
 import { EditorProvider, useEditor } from '../lib/editor-state/context'
 import { fetchKeymap } from '../lib/editor-state/io'
 import { ModalStackProvider, useModalStack } from '../lib/editor-state/modal-stack'
 import { parseKeymap } from '../lib/keymap-dt/parse'
-import type { EditorTab } from '../lib/editor-state/types'
+import type { EditorDraft, EditorTab } from '../lib/editor-state/types'
 import { BehaviorsTab } from './editor/behaviors-tab'
 import { CombosTab } from './editor/combos-tab'
 import { LayersTab } from './editor/layers-tab'
@@ -15,16 +24,58 @@ import { MouseGesturesTab } from './editor/mouse-gestures-tab'
 import { SaveDialog } from './editor/save-dialog'
 import { SensorsTab } from './editor/sensors-tab'
 
-const TABS: { id: EditorTab; label: string }[] = [
-  { id: 'layers', label: 'Layers' },
-  { id: 'combos', label: 'Combos' },
-  { id: 'macros', label: 'Macros' },
-  { id: 'behaviors', label: 'Behaviors' },
-  { id: 'sensors', label: 'Sensors' },
-  { id: 'mouse-gestures', label: 'Mouse Gestures' },
+// The rail is the single source of truth for tab ordering + identity.
+// The editor's header title needs a longer human-readable label than the
+// 6-char icon rail can fit, so map short → long here rather than teach
+// {@link NavRailItem} two labels.
+const NAV_ITEMS: NavRailItem[] = [
+  { id: 'layers', kind: 'editor-tab', label: 'Layers', Icon: LayersIcon },
+  { id: 'combos', kind: 'editor-tab', label: 'Combos', Icon: CombosIcon },
+  { id: 'macros', kind: 'editor-tab', label: 'Macros', Icon: MacrosIcon },
+  { id: 'behaviors', kind: 'editor-tab', label: 'Behav', Icon: BehaviorsIcon },
+  { id: 'sensors', kind: 'editor-tab', label: 'Sensor', Icon: SensorsIcon },
+  { id: 'mouse-gestures', kind: 'editor-tab', label: 'Mouse', Icon: MouseGesturesIcon },
+  { id: 'tester', kind: 'tester', label: 'Tester', Icon: TesterIcon, href: '/tester' },
 ]
 
-const KEYMAP_PATH_LABEL = 'config/dax3.keymap'
+const EDITOR_TAB_IDS: EditorTab[] = NAV_ITEMS.filter(
+  (i): i is NavRailItem & { kind: 'editor-tab' } => i.kind === 'editor-tab',
+).map((i) => i.id)
+
+const EDITOR_TAB_HEADER_LABEL: Record<EditorTab, string> = {
+  layers: 'Layers',
+  combos: 'Combos',
+  macros: 'Macros',
+  behaviors: 'Behaviors',
+  sensors: 'Sensors',
+  'mouse-gestures': 'Mouse Gestures',
+}
+
+// Subtitle reflects the current draft's shape rather than a constant
+// "dax3 · 46 keys" so the header at a glance signals what the tab is
+// looking at (how many combos, how many layers, etc.). Each Claude
+// Design tab HTML surfaces this kind of scoped summary next to the
+// title.
+function tabSubtitle(activeTab: EditorTab, draft: EditorDraft): string {
+  switch (activeTab) {
+    case 'layers':
+      return `dax3 · 46 keys · ${draft.layers.length} layers`
+    case 'combos':
+      return draft.combos.length === 1
+        ? '1 combo defined'
+        : `${draft.combos.length} combos defined`
+    case 'macros':
+      return draft.macros.length === 1
+        ? '1 macro defined'
+        : `${draft.macros.length} macros defined`
+    case 'behaviors':
+      return `${draft.rootBehaviors.length} global · ${draft.behaviors.length} custom`
+    case 'sensors':
+      return '2 rotary encoders'
+    case 'mouse-gestures':
+      return 'trackball · stroke directions'
+  }
+}
 
 function EditorShell() {
   const { state, dispatch } = useEditor()
@@ -125,7 +176,8 @@ function EditorShell() {
   }
 
   const dirty = state.past.length > 0
-  const activeLabel = TABS.find((t) => t.id === state.activeTab)?.label ?? ''
+  const activeLabel = EDITOR_TAB_HEADER_LABEL[state.activeTab] ?? ''
+  const activeSubtitle = tabSubtitle(state.activeTab, state.draft)
 
   const focusTab = (id: EditorTab) => {
     dispatch({ type: 'SET_ACTIVE_TAB', tab: id })
@@ -147,25 +199,23 @@ function EditorShell() {
       return
     }
     e.preventDefault()
-    const currentIdx = TABS.findIndex((t) => t.id === state.activeTab)
-    const last = TABS.length - 1
+    const currentIdx = EDITOR_TAB_IDS.indexOf(state.activeTab)
+    const last = EDITOR_TAB_IDS.length - 1
     let nextIdx = currentIdx
     if (e.key === 'ArrowUp') nextIdx = currentIdx <= 0 ? last : currentIdx - 1
     else if (e.key === 'ArrowDown') nextIdx = currentIdx >= last ? 0 : currentIdx + 1
     else if (e.key === 'Home') nextIdx = 0
     else if (e.key === 'End') nextIdx = last
-    const target = TABS[nextIdx]
-    if (target) focusTab(target.id)
+    const target = EDITOR_TAB_IDS[nextIdx]
+    if (target) focusTab(target)
   }
 
   return (
     <div class="flex-1 min-h-0 flex bg-surface-0 text-fg overflow-hidden">
       <NavRail
-        items={TABS}
-        active={state.activeTab}
+        items={NAV_ITEMS}
+        activeId={state.activeTab}
         onSelect={(id) => dispatch({ type: 'SET_ACTIVE_TAB', tab: id })}
-        configPath={KEYMAP_PATH_LABEL}
-        testerHref="/tester"
         onKeyDown={onRailKeyDown}
       />
 
@@ -173,7 +223,7 @@ function EditorShell() {
         <header class="border-b border-border-subtle px-6 py-3.5 flex items-center justify-between gap-4">
           <div class="flex items-baseline gap-3 min-w-0">
             <h1 class="text-[17px] font-bold m-0 tracking-tight">{activeLabel}</h1>
-            <span class="text-xs font-mono text-fg-subtle">dax3 · 46 keys</span>
+            <span class="text-xs font-mono text-fg-subtle">{activeSubtitle}</span>
             {dirty && (
               <span
                 class="inline-flex items-center gap-1.5 text-xs text-warning"

@@ -1,71 +1,62 @@
 import { useEffect, useRef, useState } from 'hono/jsx'
 import { Button } from '../../../components/ui/button'
 import {
+  applyModifiersOrdered,
   getBehavior,
   KEYCODES,
-  loadRecentKeycodes,
   pushRecentKeycode,
+  unwrapAllModifiers,
 } from '../../../lib/picker'
 import { useEditor } from '../../../lib/editor-state/context'
 import { physicalToMatrix } from '../../../lib/matrix-mapping'
 import type { BindingChain } from '../../../lib/keymap-dt/types'
-import { InspectorShell } from '../../../components/editor/inspector-shell'
 import { ArgumentControl } from '../picker/argument-control'
 import { BehaviorCombobox } from '../picker/behavior-combobox'
 import { BtSpecialForm } from '../picker/bt-special-form'
+import { ModifierToggles } from '../picker/modifier-toggles'
 
 const KEYCODE_TOKEN_SET = new Set(KEYCODES.map((k) => k.token))
 
-export type BindingInspectorProps = {
-  /** Position on the physical board (0-45) — anchors the "selected key"
-   *  card. Pass -1 (or omit) when the target isn't a physical key
-   *  (e.g. sensor encoder, mouse gesture direction). */
+const MICRO_LABEL =
+  'absolute bottom-full left-0 mb-[6px] whitespace-nowrap font-mono font-semibold text-[8.5px] leading-none uppercase tracking-[.06em] text-fg-subtler'
+
+const CHEVRON =
+  'font-mono font-medium text-[13px] leading-none text-fg-subtler shrink-0'
+
+export type BindingDockProps = {
   keyIdx?: number
-  /** Optional label for non-key targets (`CCW stroke`, `RIGHT stroke`, …).
-   *  Used only when `keyIdx` is negative. */
   targetLabel?: string
-  /** Small monospace subtitle under `targetLabel`. */
   targetSubtitle?: string
-  /** Existing chain being edited. Empty / `&trans` fall back to `&kp`. */
   initial: BindingChain
   onCancel: () => void
   onCommit: (chain: BindingChain) => void
 }
 
 /**
- * Right-panel binding editor. Semantically the same picker as the legacy
- * `BindingPicker` modal — Behaviour combobox + Arguments (with modifier
- * chips for `&kp`) + Recent chips + preview — but rendered as a docked
- * inspector so the user can see the board and the edit side-by-side.
- *
- * Commit / cancel routing differs from the modal picker:
- *   - No Dialog runTeardown: this panel is a plain conditional render.
- *   - The `Commit` button uses `onMouseDown` + activeElement.blur() to flush
- *     any focused ArgumentControl's pending value into `argsRef` before
- *     `commit()` reads it. Same rationale as the modal picker — combobox
- *     blurs cause layout shifts that make `onClick` miss.
+ * Bottom-dock binding editor shared by every tab that needs to
+ * configure a `&behaviour arg0 arg1…` chain (Layers / Combos / Sensors
+ * / Mouse Gestures / Macros nested). The `<div class="contents">` root
+ * lets the caller's `<DockShell>` claim the identity / center / actions
+ * slots directly, so this file never carries an outer aside chrome —
+ * every rendering is a horizontal dock row.
  */
-export function BindingInspector({
+export function BindingDock({
   keyIdx = -1,
   targetLabel,
   targetSubtitle,
   initial,
   onCancel,
   onCommit,
-}: BindingInspectorProps) {
+}: BindingDockProps) {
   const { state } = useEditor()
 
-  const isEmpty = initial.tokens.length === 0 || initial.tokens[0] === '&trans'
+  const isEmpty = initial.tokens.length === 0
   const initialBehaviorToken = isEmpty ? '&kp' : initial.tokens[0]!
 
   const [behaviorToken, setBehaviorToken] = useState(initialBehaviorToken)
   const [args, setArgs] = useState<string[]>(isEmpty ? [] : initial.tokens.slice(1))
   const [activeArgIdx, setActiveArgIdx] = useState(0)
-  const [recent, setRecent] = useState<string[]>([])
 
-  // Synchronous mirrors — commit() reads these instead of the render closure
-  // so blur-then-commit within one task sees the latest values. Same pattern
-  // as the legacy BindingPicker (`binding-picker.tsx:37-39`).
   const argsRef = useRef<string[]>(args)
   const behaviorRef = useRef<string>(behaviorToken)
   argsRef.current = args
@@ -78,15 +69,18 @@ export function BindingInspector({
   const normalizedArgs = Array.from({ length: expectedArity }, (_, i) => args[i] ?? '')
 
   useEffect(() => {
-    // Refresh the recents each mount — localStorage may have been updated by
-    // a previous commit in this session.
-    setRecent(loadRecentKeycodes())
-  }, [keyIdx])
-
-  useEffect(() => {
     const first = argTypes.findIndex((t) => t === 'keycode')
     setActiveArgIdx(first === -1 ? 0 : first)
   }, [behaviorToken])
+
+  // Selection reset is owned by the callers via a `key` prop keyed on
+  // the active target (e.g. Layers uses `key={selectedKeyIdx}`, Sensors
+  // uses `key={editing.encoderIdx}`), so this component only reads
+  // `initial` at mount. That contract also solves the case where an
+  // external mutation (Undo/Redo, Sensors' Swap CCW/CW, bulk paste)
+  // rewrites the current target while the dock is open — remount reads
+  // the fresh `initial`; a props-to-state effect keyed on `initial`
+  // would instead fight the local edits the user is composing.
 
   const previewTokens =
     behaviorToken === '&bt'
@@ -139,13 +133,6 @@ export function BindingInspector({
     }
   }
 
-  const applyRecent = (token: string) => {
-    if (activeArgIdx < 0) return
-    updateArg(activeArgIdx, token)
-    pushRecentKeycode(token)
-    advanceAfter(activeArgIdx)
-  }
-
   const coord = keyIdx >= 0 ? physicalToMatrix(keyIdx) : null
   const displayChar =
     behaviorToken === '&kp' && normalizedArgs[0]
@@ -154,9 +141,18 @@ export function BindingInspector({
         ? '·'
         : behaviorToken.replace(/^&/, '')
 
-  // Cmd/Ctrl+Enter commits from anywhere in the panel. Escape cancels only
-  // when a text input is not composing — the ArgumentControl children handle
-  // their own Escape semantics for the combobox listbox.
+  // Scale identity-chip font-size down for longer custom-behaviour tokens
+  // (e.g. `&enc_scroll` → `enc_scroll`, 10 chars) so they read cleanly
+  // inside the 58×58 chip instead of overflowing at the default 20px.
+  const displayCharClass =
+    displayChar.length <= 3
+      ? 'text-[20px]'
+      : displayChar.length <= 5
+        ? 'text-[15px]'
+        : displayChar.length <= 7
+          ? 'text-[11px]'
+          : 'text-[9px]'
+
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.defaultPrevented) return
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -166,106 +162,111 @@ export function BindingInspector({
     }
   }
 
+  const onBehaviorChange = (next: string) => {
+    setBehaviorToken(next)
+    behaviorRef.current = next
+    const nextBehavior = getBehavior(next)
+    const nextArity = nextBehavior?.arity?.[0] ?? 0
+    const nextArgTypes = nextBehavior?.argTypes ?? []
+    const prevArgTypes = behavior?.argTypes ?? []
+    const sameShape =
+      nextArgTypes.length === prevArgTypes.length &&
+      nextArgTypes.every((t, i) => t === prevArgTypes[i])
+    const currentArgs = argsRef.current ?? args
+    const newArgs = sameShape
+      ? Array.from({ length: nextArity }, (_, i) => currentArgs[i] ?? '')
+      : Array.from({ length: nextArity }, () => '')
+    argsRef.current = newArgs
+    setArgs(newArgs)
+  }
+
+  const primaryTitle = coord ? 'Selected key' : (targetLabel ?? 'Selected')
+  const primarySubtitle = coord
+    ? `pos ${keyIdx} · row ${coord.row} col ${coord.col}`
+    : (targetSubtitle ?? '')
+
   return (
-    <InspectorShell
-      title="Binding"
-      ariaLabel="Binding editor"
-      width={356}
-      onKeyDown={handleKeyDown}
-      headerRight={<span class="text-[10.5px] font-mono text-fg-subtle">⌘↵ commit · esc</span>}
-      footer={
-        <>
-          <Button size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            // See `binding-picker.tsx:143` for the mousedown → blur → commit
-            // rationale (blur must flush pending pending combobox state before
-            // commit reads argsRef).
-            onMouseDown={(e: MouseEvent) => {
-              e.preventDefault()
-              if (document.activeElement instanceof HTMLElement) {
-                document.activeElement.blur()
-              }
-              commit()
-            }}
+    <div class="contents" onKeyDown={handleKeyDown}>
+      <div class="flex-none flex items-center gap-[13px] pr-[22px] border-r border-[rgba(22,24,29,.08)]">
+        <span
+          class="w-[58px] h-[58px] shrink-0 rounded-[7px] border-[1.5px] border-accent bg-[rgba(79,91,107,.07)] shadow-[0_0_0_3px_rgba(79,91,107,.1)] flex items-center justify-center overflow-hidden box-border px-1"
+          aria-label={behaviorToken === '&trans' ? 'trans (transparent)' : undefined}
+          title={behaviorToken === '&trans' ? 'trans (transparent)' : behaviorToken}
+        >
+          <span
+            class={`font-mono font-semibold text-fg leading-[1.1] text-center break-words ${displayCharClass}`}
           >
-            Commit
-          </Button>
-        </>
-      }
-    >
-      <>
-        <div class="flex items-center gap-3 p-3 rounded-xl bg-accent-soft border border-accent">
-          <span class="w-9 h-9 shrink-0 rounded-lg bg-surface-0 border border-accent flex items-center justify-center text-[16px] font-mono font-semibold text-accent">
             {displayChar}
           </span>
-          <div class="flex flex-col gap-0.5">
-            <span class="text-[12.5px] font-semibold">
-              {coord ? 'Selected key' : (targetLabel ?? 'Selected')}
-            </span>
-            <span class="text-[10.5px] font-mono text-fg-muted">
-              {coord
-                ? `row ${coord.row} · col ${coord.col} · pos ${keyIdx}`
-                : (targetSubtitle ?? '')}
-            </span>
+        </span>
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center gap-2">
+            <span class="text-[12.5px] font-semibold leading-none text-fg">{primaryTitle}</span>
+            <button
+              type="button"
+              aria-label="Deselect"
+              title="Deselect"
+              onClick={onCancel}
+              class="text-[12px] font-semibold leading-none text-fg-subtler hover:text-fg-muted cursor-pointer"
+            >
+              ✕
+            </button>
           </div>
+          <span class="text-[10.5px] font-mono leading-none text-fg-muted whitespace-nowrap">
+            {primarySubtitle}
+          </span>
         </div>
+      </div>
 
-        <div class="flex flex-col gap-2">
-          <span class="text-[12px] font-semibold text-fg-muted">Behaviour</span>
-          <BehaviorCombobox
-            value={behaviorToken}
-            onChange={(next) => {
-              setBehaviorToken(next)
-              behaviorRef.current = next
-              const nextBehavior = getBehavior(next)
-              const nextArity = nextBehavior?.arity?.[0] ?? 0
-              const nextArgTypes = nextBehavior?.argTypes ?? []
-              const prevArgTypes = behavior?.argTypes ?? []
-              const sameShape =
-                nextArgTypes.length === prevArgTypes.length &&
-                nextArgTypes.every((t, i) => t === prevArgTypes[i])
-              const currentArgs = argsRef.current ?? args
-              const newArgs = sameShape
-                ? Array.from({ length: nextArity }, (_, i) => currentArgs[i] ?? '')
-                : Array.from({ length: nextArity }, () => '')
-              argsRef.current = newArgs
-              setArgs(newArgs)
-            }}
-          />
-          {behavior?.description && (
-            <div class="text-[10.5px] text-fg-subtle">{behavior.description}</div>
-          )}
-        </div>
+      <div class="flex-1 min-w-0 flex flex-col justify-center px-[22px]">
+        <div class="flex items-center gap-2 flex-nowrap min-w-0">
+          <div class="relative flex-1 min-w-[118px] max-w-[210px]">
+            <BehaviorCombobox
+              value={behaviorToken}
+              onChange={onBehaviorChange}
+              popoverPlacement="above"
+            />
+          </div>
 
-        {behaviorToken === '&bt' ? (
-          <BtSpecialForm
-            tokens={['&bt', ...args]}
-            onChange={(t) => {
-              const nextArgs = t.slice(1)
-              argsRef.current = nextArgs
-              setArgs(nextArgs)
-            }}
-          />
-        ) : (
-          expectedArity > 0 && (
-            <div class="flex flex-col gap-2">
-              <span class="text-[12px] font-semibold text-fg-muted">
-                Arguments <span class="text-fg-subtle">({expectedArity})</span>
-              </span>
-              <div class="flex flex-col gap-3">
-                {normalizedArgs.map((value, i) => {
-                  const argType = argTypes[i]
-                  const isActive = i === activeArgIdx
-                  const label = argLabels?.[i] ?? argType ?? 'arg'
-                  const pinModifiers =
-                    behaviorToken === '&mt' && i === 0 && argType === 'keycode'
-                  return (
+          {behaviorToken === '&bt' ? (
+            <>
+              <span class={CHEVRON} aria-hidden="true">›</span>
+              <div class="flex-1 min-w-[180px]">
+                <BtSpecialForm
+                  tokens={['&bt', ...args]}
+                  onChange={(t) => {
+                    const nextArgs = t.slice(1)
+                    argsRef.current = nextArgs
+                    setArgs(nextArgs)
+                  }}
+                />
+              </div>
+            </>
+          ) : (
+            expectedArity > 0 &&
+            normalizedArgs.map((value, i) => {
+              const argType = argTypes[i]
+              const isActive = i === activeArgIdx
+              const label = argLabels?.[i] ?? argType ?? 'arg'
+              const pinModifiers = behaviorToken === '&mt' && i === 0 && argType === 'keycode'
+              // Split modifier chips out of the KeycodeCombobox so they sit
+              // as a sibling MODIFIERS slot on the same baseline as the
+              // KEYCODE input. Otherwise the internal ModifierToggles
+              // stacks above the input and breaks the design's single-row
+              // rhythm (labels on top, controls aligned across all cells).
+              const showModifierSlot = argType === 'keycode' && !pinModifiers
+              const { inner: keycodeBase, wraps: keycodeMods } = showModifierSlot
+                ? unwrapAllModifiers(value || '')
+                : { inner: value, wraps: new Set<never>() as Set<never> }
+              const slotFlex =
+                argType === 'keycode'
+                  ? 'flex-1 basis-0 min-w-[104px] max-w-[180px]'
+                  : 'flex-none min-w-[128px] max-w-[170px]'
+              return (
+                <>
+                  <span class={CHEVRON} aria-hidden="true" key={`ch-${i}`}>›</span>
+                  <div class={slotFlex} key={`${behaviorToken}-${i}`}>
                     <ArgumentControl
-                      key={`${behaviorToken}-${i}`}
                       argType={argType}
                       value={value}
                       onChange={(v) => {
@@ -285,42 +286,64 @@ export function BindingInspector({
                       onFocus={() => setActiveArgIdx(i)}
                       label={label}
                       autoFocus={i === activeArgIdx}
+                      popoverPlacement="above"
+                      compact
+                      hideModifiers={showModifierSlot}
                     />
-                  )
-                })}
-              </div>
-            </div>
-          )
-        )}
+                  </div>
+                  {showModifierSlot && (
+                    <>
+                      <span class={CHEVRON} aria-hidden="true" key={`ch-mod-${i}`}>+</span>
+                      <div class="relative flex-none" key={`mod-${i}`}>
+                        <span class={MICRO_LABEL}>MODIFIERS</span>
+                        <ModifierToggles
+                          active={keycodeMods}
+                          onChange={(nextWraps) => {
+                            const composed = applyModifiersOrdered(
+                              keycodeBase || '',
+                              nextWraps,
+                            )
+                            updateArg(i, composed)
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
+                </>
+              )
+            })
+          )}
+        </div>
+      </div>
 
-        {recent.length > 0 && argTypes.some((t) => t === 'keycode') && (
-          <div class="flex flex-col gap-2">
-            <span class="text-[10.5px] font-mono font-semibold tracking-wider text-fg-subtle">
-              RECENT
-            </span>
-            <div class="flex flex-wrap gap-1.5">
-              {recent.slice(0, 8).map((token) => (
-                <button
-                  key={token}
-                  type="button"
-                  onClick={() => applyRecent(token)}
-                  class="px-2.5 py-1 border border-border-subtle rounded-md text-[12px] font-mono text-fg-muted bg-surface-0 hover:text-fg hover:bg-surface-2 transition-colors"
-                  title={`Insert ${token} into active argument`}
-                >
-                  {token}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div class="flex items-center gap-3 p-3 rounded-lg bg-surface-3">
-          <span class="text-[11px] text-fg-subtle">Preview</span>
-          <span class="text-[13.5px] font-mono font-semibold text-fg">
+      <div class="flex-none flex items-center gap-[14px] pl-[22px] border-l border-[rgba(22,24,29,.08)]">
+        <div class="relative hidden md:block">
+          <span class={MICRO_LABEL}>PREVIEW</span>
+          <span
+            class="inline-block font-mono font-semibold text-[13.5px] leading-none text-fg px-[11px] py-[6px] rounded-[5px] bg-[rgba(22,24,29,.05)] whitespace-nowrap"
+            title="Preview of the chain that will be committed"
+          >
             {previewText || '—'}
           </span>
         </div>
-      </>
-    </InspectorShell>
+        <Button size="md" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          size="md"
+          variant="primary"
+          class="px-[22px] py-[10px]"
+          onMouseDown={(e: MouseEvent) => {
+            e.preventDefault()
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur()
+            }
+            commit()
+          }}
+        >
+          Commit
+        </Button>
+      </div>
+    </div>
   )
 }

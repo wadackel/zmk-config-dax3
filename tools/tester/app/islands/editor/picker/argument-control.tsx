@@ -2,6 +2,7 @@
 // control for its `argType` (keycode → combobox, layer → native select, etc.).
 
 import { useEffect } from 'hono/jsx'
+import { DockField } from '../../../components/editor/dock-field'
 import type { BehaviorArgType } from '../../../lib/picker'
 import type { LayerData } from '../../../lib/keymap-dt/types'
 import { KeycodeCombobox } from './keycode-combobox'
@@ -21,6 +22,21 @@ type Props = {
   onFocus: () => void
   label: string
   autoFocus?: boolean
+  /** Forwarded to the keycode combobox — see {@link KeycodeCombobox}. */
+  popoverPlacement?: 'below' | 'above'
+  /**
+   * When true, render the slot inline as a bottom-dock cell (no border
+   * around the slot itself, tight micro label above). Default false
+   * keeps the boxed inspector look.
+   */
+  compact?: boolean
+  /**
+   * When true, do NOT render the internal `ModifierToggles` bar above
+   * the keycode input. The parent (bottom dock) uses this so the
+   * modifier chips sit as a peer cell to the KEYCODE input rather than
+   * stacked above it, matching the design's single-baseline row.
+   */
+  hideModifiers?: boolean
 }
 
 const MSC_OPTIONS = ['SCRL_UP', 'SCRL_DOWN', 'SCRL_LEFT', 'SCRL_RIGHT']
@@ -38,11 +54,54 @@ export function ArgumentControl({
   onFocus,
   label,
   autoFocus,
+  popoverPlacement,
+  compact = false,
+  hideModifiers = false,
 }: Props) {
+  if (compact) {
+    // Keycode combobox owns its own DockField chrome so it can wire `active`
+    // to the popover-open state and mount the listbox in the field's own
+    // relative coord space. Every other argType wraps its plain input/select
+    // in a DockField here, using `isActive` as the visual accent.
+    if (argType === 'keycode') {
+      return (
+        <div onFocusin={onFocus}>
+          <KeycodeCombobox
+            value={value}
+            onChange={onChange}
+            onCommit={onCommit}
+            pinModifiers={pinModifiers}
+            autoFocus={autoFocus}
+            popoverPlacement={popoverPlacement}
+            hideModifiers={hideModifiers}
+            dockField
+            fieldLabel={label}
+          />
+        </div>
+      )
+    }
+    return (
+      <div onFocusin={onFocus}>
+        <DockField label={label} active={isActive}>
+          <ArgumentInput
+            argType={argType}
+            value={value}
+            onChange={onChange}
+            onCommit={onCommit}
+            pinModifiers={pinModifiers}
+            layers={layers}
+            autoFocus={autoFocus}
+            popoverPlacement={popoverPlacement}
+            hideModifiers={hideModifiers}
+            compact
+          />
+        </DockField>
+      </div>
+    )
+  }
   const wrapperClass = `flex flex-col gap-1 p-2 rounded-md border ${
     isActive ? 'border-accent' : 'border-border'
   }`
-
   return (
     <div class={wrapperClass} onFocusin={onFocus}>
       <span class="text-[10px] text-fg-subtle">{label}</span>
@@ -54,6 +113,7 @@ export function ArgumentControl({
         pinModifiers={pinModifiers}
         layers={layers}
         autoFocus={autoFocus}
+        popoverPlacement={popoverPlacement}
       />
     </div>
   )
@@ -67,7 +127,10 @@ function ArgumentInput({
   pinModifiers,
   layers,
   autoFocus,
-}: Pick<Props, 'argType' | 'value' | 'onChange' | 'onCommit' | 'pinModifiers' | 'layers' | 'autoFocus'>) {
+  popoverPlacement,
+  hideModifiers,
+  compact,
+}: Pick<Props, 'argType' | 'value' | 'onChange' | 'onCommit' | 'pinModifiers' | 'layers' | 'autoFocus' | 'popoverPlacement' | 'hideModifiers' | 'compact'>) {
   switch (argType) {
     case 'keycode':
       return (
@@ -77,10 +140,20 @@ function ArgumentInput({
           onCommit={onCommit}
           pinModifiers={pinModifiers}
           autoFocus={autoFocus}
+          popoverPlacement={popoverPlacement}
+          hideModifiers={hideModifiers}
         />
       )
     case 'layer':
-      return <LayerSelect value={value} onChange={onChange} layers={layers} autoFocus={autoFocus} />
+      return (
+        <LayerSelect
+          value={value}
+          onChange={onChange}
+          layers={layers}
+          autoFocus={autoFocus}
+          compact={compact}
+        />
+      )
     case 'msc-action':
       return (
         <NativeSelect
@@ -89,6 +162,7 @@ function ArgumentInput({
           onChange={onChange}
           autoFocus={autoFocus}
           fallback="SCRL_UP"
+          compact={compact}
         />
       )
     case 'output':
@@ -99,6 +173,7 @@ function ArgumentInput({
           onChange={onChange}
           autoFocus={autoFocus}
           fallback="OUT_USB"
+          compact={compact}
         />
       )
     case 'gesture':
@@ -109,6 +184,7 @@ function ArgumentInput({
           onChange={onChange}
           autoFocus={autoFocus}
           fallback="UP"
+          compact={compact}
         />
       )
     case 'profile':
@@ -117,7 +193,11 @@ function ArgumentInput({
       return (
         <input
           type="text"
-          class="w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg font-mono"
+          class={
+            compact
+              ? 'flex-1 min-w-0 border-none outline-none bg-transparent font-mono font-semibold text-[13px] leading-none text-fg'
+              : 'w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg font-mono'
+          }
           value={value}
           autoFocus={autoFocus}
           onInput={(e: Event) => onChange((e.target as HTMLInputElement).value)}
@@ -137,11 +217,13 @@ function LayerSelect({
   onChange,
   layers,
   autoFocus,
+  compact,
 }: {
   value: string
   onChange: (next: string) => void
   layers: LayerData[]
   autoFocus?: boolean
+  compact?: boolean
 }) {
   // Sync the displayed fallback ("0") back to the parent so commit() never
   // records an empty layer index. Triggered on mount or after a behaviour
@@ -159,7 +241,11 @@ function LayerSelect({
 
   return (
     <select
-      class="w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg font-mono"
+      class={
+        compact
+          ? 'flex-1 min-w-0 border-none outline-none bg-transparent font-mono font-semibold text-[13px] leading-none text-fg cursor-pointer'
+          : 'w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg font-mono'
+      }
       autoFocus={autoFocus}
       onChange={(e: Event) => onChange((e.target as HTMLSelectElement).value)}
     >
@@ -178,12 +264,14 @@ function NativeSelect({
   onChange,
   autoFocus,
   fallback,
+  compact,
 }: {
   value: string
   options: readonly string[]
   onChange: (next: string) => void
   autoFocus?: boolean
   fallback: string
+  compact?: boolean
 }) {
   const current = options.includes(value) ? value : fallback
   // Sync the displayed fallback back to the parent so commit() never records
@@ -198,7 +286,11 @@ function NativeSelect({
   // before children mount. Mark the target <option> as `selected` instead.
   return (
     <select
-      class="w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg font-mono"
+      class={
+        compact
+          ? 'flex-1 min-w-0 border-none outline-none bg-transparent font-mono font-semibold text-[13px] leading-none text-fg cursor-pointer'
+          : 'w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg font-mono'
+      }
       autoFocus={autoFocus}
       onChange={(e: Event) => onChange((e.target as HTMLSelectElement).value)}
     >

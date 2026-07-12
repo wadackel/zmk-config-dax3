@@ -1,9 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'hono/jsx'
+import { DockField } from '../../../components/editor/dock-field'
 import { BEHAVIORS, getBehavior, type BehaviorEntry, type BehaviorGroup } from '../../../lib/picker'
 
 type Props = {
   value: string
   onChange: (next: string) => void
+  /**
+   * Where the listbox pops relative to the input. `below` is the
+   * default (right-side inspector). `above` flips the listbox so it
+   * opens upward — used by the bottom dock where downward-opening
+   * listboxes would fall off the viewport.
+   */
+  popoverPlacement?: 'below' | 'above'
+  /** Accessible name for the combobox input. */
+  ariaLabel?: string
 }
 
 const GROUP_LABEL: Record<BehaviorGroup, string> = {
@@ -57,13 +67,19 @@ function buildRows(query: string): Row[] {
   return rows
 }
 
-export function BehaviorCombobox({ value, onChange }: Props) {
+export function BehaviorCombobox({
+  value,
+  onChange,
+  popoverPlacement = 'below',
+  ariaLabel = 'Behaviour',
+}: Props) {
   const current = getBehavior(value)
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState(0)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
+  const skipBlurCloseRef = useRef(false)
 
   const rows = useMemo(() => buildRows(query), [query])
   const selectableIndexes = useMemo(() => {
@@ -137,14 +153,73 @@ export function BehaviorCombobox({ value, onChange }: Props) {
     }
   }
 
+  const popover = open ? (
+    <div
+      ref={listRef}
+      role="listbox"
+      class={[
+        'max-h-[24rem] overflow-auto bg-white border border-[rgba(22,24,29,.12)] rounded-[8px] shadow-[0_12px_34px_rgba(22,24,29,.16)] p-[7px] z-30 absolute left-0 right-0',
+        popoverPlacement === 'above' ? 'bottom-full mb-[24px]' : 'top-full mt-[6px]',
+      ].join(' ')}
+    >
+      {rows.length === 0 && (
+        <div class="px-[10px] py-[9px] text-fg-subtler font-mono text-[11px] italic text-center">
+          No matching behaviour
+        </div>
+      )}
+      {rows.map((row, i) => {
+        if (row.kind === 'header') {
+          return (
+            <div
+              key={`h-${row.group}`}
+              data-row={i}
+              class="px-[10px] pt-[8px] pb-[4px] font-mono font-semibold text-[8.5px] uppercase tracking-[.06em] leading-none text-fg-subtler"
+            >
+              {GROUP_LABEL[row.group]}
+            </div>
+          )
+        }
+        const isActive = i === activeIdx
+        const isSelected = row.entry.token === value
+        const bgClass = isActive
+          ? 'bg-[rgba(79,91,107,.12)]'
+          : isSelected
+            ? 'bg-[rgba(79,91,107,.05)]'
+            : 'hover:bg-[rgba(79,91,107,.05)]'
+        return (
+          <button
+            key={`i-${row.entry.token}`}
+            type="button"
+            role="option"
+            aria-selected={isActive ? 'true' : 'false'}
+            data-row={i}
+            data-token={row.entry.token}
+            class={`flex flex-col items-start gap-[2px] w-full text-left px-[10px] py-[9px] rounded-[6px] transition-colors ${bgClass}`}
+            onMouseEnter={() => setActiveIdx(i)}
+            onMouseDown={(e: Event) => e.preventDefault()}
+            onClick={() => commitRow(i)}
+          >
+            <span class="font-mono font-semibold text-[13px] leading-none text-fg w-full truncate">
+              {row.entry.token}
+            </span>
+            <span class="font-sans font-medium text-[12px] leading-none text-fg-muted w-full truncate">
+              {row.entry.label}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  ) : null
+
   return (
-    <div class="relative">
+    <DockField label="BEHAVIOUR" active={open} overlay={popover}>
       <input
         ref={inputRef}
         type="text"
-        class="w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg font-mono"
-        value={open ? query : current ? `${current.token} — ${current.label}` : value}
-        placeholder="search behaviour (e.g. tap, layer, mod)"
+        class="flex-1 min-w-0 border-none outline-none bg-transparent font-mono font-semibold text-[13px] leading-none text-fg"
+        value={open ? query : value}
+        placeholder="search"
+        aria-label={ariaLabel}
         onFocus={(e: Event) => {
           ;(e.target as HTMLInputElement).select()
           setQuery('')
@@ -155,54 +230,40 @@ export function BehaviorCombobox({ value, onChange }: Props) {
           setOpen(true)
         }}
         onBlur={() => {
-          setTimeout(() => setOpen(false), 120)
+          setTimeout(() => {
+            if (skipBlurCloseRef.current) {
+              skipBlurCloseRef.current = false
+              return
+            }
+            setOpen(false)
+          }, 120)
         }}
         onKeyDown={handleKeyDown}
       />
-      {open && (
-        <div
-          ref={listRef}
-          role="listbox"
-          class="mt-1 max-h-[24rem] overflow-auto bg-surface-1 border border-border-strong rounded-md shadow-lg"
+      {current && !open && (
+        <span
+          class="font-sans font-medium text-[10px] leading-none text-fg-subtle whitespace-nowrap cursor-pointer"
+          onMouseDown={(e: Event) => {
+            e.preventDefault()
+            skipBlurCloseRef.current = true
+            setQuery('')
+            setOpen((cur) => !cur)
+            inputRef.current?.focus()
+          }}
         >
-          {rows.length === 0 && (
-            <div class="px-3 py-2 text-fg-subtle text-xs italic">No matching behaviour</div>
-          )}
-          {rows.map((row, i) => {
-            if (row.kind === 'header') {
-              return (
-                <div
-                  key={`h-${row.group}`}
-                  data-row={i}
-                  class="px-3 py-1 text-[10px] uppercase text-fg-subtle bg-surface-2 border-b border-border"
-                >
-                  {GROUP_LABEL[row.group]}
-                </div>
-              )
-            }
-            const isActive = i === activeIdx
-            return (
-              <button
-                key={`i-${row.entry.token}`}
-                type="button"
-                role="option"
-                aria-selected={isActive ? 'true' : 'false'}
-                data-row={i}
-                data-token={row.entry.token}
-                class={`flex items-center justify-between w-full text-left px-3 py-1 text-sm font-mono ${
-                  isActive ? 'bg-accent text-accent-fg' : 'text-fg hover:bg-surface-3'
-                }`}
-                onMouseEnter={() => setActiveIdx(i)}
-                onMouseDown={(e: Event) => e.preventDefault()}
-                onClick={() => commitRow(i)}
-              >
-                <span>{row.entry.token}</span>
-                <span class="text-fg-subtle text-xs">{row.entry.label}</span>
-              </button>
-            )
-          })}
-        </div>
+          {current.label}
+        </span>
       )}
-    </div>
+      <span
+        class="text-[10px] leading-none text-fg-subtler cursor-pointer"
+        aria-hidden="true"
+        onMouseDown={(e: Event) => {
+          e.preventDefault()
+          inputRef.current?.focus()
+        }}
+      >
+        ▾
+      </span>
+    </DockField>
   )
 }

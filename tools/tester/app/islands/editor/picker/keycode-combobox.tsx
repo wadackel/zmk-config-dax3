@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'hono/jsx'
+import { DockField } from '../../../components/editor/dock-field'
 import {
   applyModifiersOrdered,
   COMMON_KEYCODES,
@@ -31,6 +32,38 @@ type Props = {
   autoFocus?: boolean
   /** Optional placeholder for the underlying text input. */
   placeholder?: string
+  /**
+   * Where the listbox pops relative to the input. `below` is the
+   * default (right-side inspector). `above` flips the listbox so it
+   * opens upward — used by the bottom dock where downward-opening
+   * listboxes would fall off the viewport.
+   */
+  popoverPlacement?: 'below' | 'above'
+  /** Accessible name for the combobox input. */
+  ariaLabel?: string
+  /**
+   * When true, the internal `<ModifierToggles>` is not rendered here.
+   * The bottom dock uses this so the parent can render the modifier
+   * chips as a peer slot to the right of the KEYCODE input — that way
+   * both controls share one baseline and the row does not stack into
+   * two visual lines.
+   *
+   * The modifier state stays derivable from `value` (via
+   * `unwrapAllModifiers`), so the parent can drop in its own
+   * `<ModifierToggles>` whose `active` comes from the unwrapped set and
+   * whose `onChange` re-composes the token with `applyModifiersOrdered`
+   * and re-emits via `onChange`.
+   */
+  hideModifiers?: boolean
+  /**
+   * When true, wrap the input+popover in the bottom-dock `<DockField>`
+   * chrome (uppercase label + white pill + slate ring when open). Left
+   * off, the component renders as a plain input styled for the right-
+   * side inspector.
+   */
+  dockField?: boolean
+  /** Micro-label shown above the DockField chrome. Ignored when `dockField` is false. */
+  fieldLabel?: string
 }
 
 type Item = {
@@ -59,6 +92,11 @@ export function KeycodeCombobox({
   pinModifiers,
   autoFocus,
   placeholder,
+  popoverPlacement = 'below',
+  ariaLabel = 'Keycode',
+  hideModifiers,
+  dockField = false,
+  fieldLabel = 'KEYCODE',
 }: Props) {
   // Decompose the raw token into base keycode + modifier set so editing
   // existing `LC(A)` style values shows the right toggle state.
@@ -75,6 +113,7 @@ export function KeycodeCombobox({
 
   const inputRef = useRef<HTMLInputElement | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
+  const skipBlurCloseRef = useRef(false)
 
   // When the parent updates `value`, sync the local state down. We distinguish
   // two cases:
@@ -270,87 +309,176 @@ export function KeycodeCombobox({
     }
   }
 
-  return (
-    <div class="relative">
-      {!pinModifiers && <ModifierToggles active={modWraps} onChange={handleModifierChange} />}
-      <input
-        ref={inputRef}
-        type="text"
-        class="w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg font-mono"
-        value={query}
-        placeholder={placeholder ?? 'type to search (e.g. lang, scroll, A)'}
-        onFocus={() => setOpen(true)}
-        onInput={(e: Event) => {
-          const v = (e.target as HTMLInputElement).value
-          setQuery(v)
-          setOpen(true)
-          setActiveIdx(0)
-        }}
-        onBlur={() => {
-          // Sync-emit the pending typed value so a subsequent click (e.g.
-          // Commit button) reads the resolved value via `argsRef`. The
-          // listbox close is deferred so the modal layout does not shrink
-          // mid-click — between mousedown and click the Commit button would
-          // otherwise move out from under the cursor.
-          const trimmed = query.trim()
-          if (trimmed && trimmed !== baseToken) {
-            const matches = searchKeycodesRanked(trimmed)
-            const resolved = matches.length > 0 ? matches[0].token : trimmed
-            setBaseToken(resolved)
-            setQuery(resolved)
-            composeAndEmit(resolved, modWraps)
-          }
-          setTimeout(() => setOpen(false), 120)
-        }}
-        onKeyDown={handleKeyDown}
-      />
-      {open && (
-        <div
-          ref={listRef}
-          role="listbox"
-          class="mt-1 max-h-[28rem] overflow-auto bg-surface-1 border border-border-strong rounded-md shadow-lg"
-        >
-          {items.length === 0 && (
-            <div class="px-3 py-2 text-fg-subtle text-xs italic">
-              No catalogue match. The current input "{query}" will save as-is.
-            </div>
-          )}
-          {items.map((item, i) => {
-            const isActive = i === activeIdx
-            const label = item.entry.label
-            const token = item.entry.token
-            const showTokenSuffix = label !== token
-            return (
-              <button
-                key={`${item.section}-${token}-${i}`}
-                type="button"
-                role="option"
-                aria-selected={isActive ? 'true' : 'false'}
-                data-idx={i}
-                data-token={token}
-                class={`flex items-center justify-between w-full text-left px-3 py-1 text-sm font-mono ${
-                  isActive ? 'bg-accent text-accent-fg' : 'text-fg hover:bg-surface-3'
-                }`}
-                onMouseEnter={() => setActiveIdx(i)}
-                onMouseDown={(e: Event) => e.preventDefault()} // keep input focus
-                onClick={() => commitItem(item)}
-              >
-                <span class="flex items-center gap-2">
-                  {item.section === 'recent' && (
-                    <span class="text-[9px] text-emerald-400 uppercase">recent</span>
-                  )}
-                  {item.section === 'common' && (
-                    <span class="text-[9px] text-fg-subtle uppercase">common</span>
-                  )}
-                  <span>{label}</span>
-                </span>
-                {showTokenSuffix && <span class="text-fg-subtle text-xs">{token}</span>}
-              </button>
-            )
-          })}
+  const popover = open ? (
+    <div
+      ref={listRef}
+      role="listbox"
+      class={
+        dockField
+          ? [
+              'absolute left-0 right-0 max-h-[28rem] overflow-auto bg-white border border-[rgba(22,24,29,.12)] rounded-[8px] shadow-[0_12px_34px_rgba(22,24,29,.16)] p-[7px] z-30',
+              popoverPlacement === 'above' ? 'bottom-full mb-[24px]' : 'top-full mt-[6px]',
+            ].join(' ')
+          : [
+              'max-h-[28rem] overflow-auto bg-surface-1 border border-border-strong rounded-md shadow-lg',
+              popoverPlacement === 'above'
+                ? 'absolute left-0 right-0 bottom-full mb-1 z-30'
+                : 'mt-1',
+            ].join(' ')
+      }
+    >
+      {items.length === 0 && (
+        <div class={dockField ? 'px-[10px] py-[9px] text-fg-subtler font-mono text-[11px] italic text-center' : 'px-3 py-2 text-fg-subtle text-xs italic'}>
+          No catalogue match. The current input "{query}" will save as-is.
         </div>
       )}
-      {!pinModifiers && modWraps.size > 0 && (
+      {items.map((item, i) => {
+        const isActive = i === activeIdx
+        const label = item.entry.label
+        const token = item.entry.token
+        const showTokenSuffix = label !== token
+        const isSelected = token === baseToken
+        if (dockField) {
+          const bgClass = isActive
+            ? 'bg-[rgba(79,91,107,.12)]'
+            : isSelected
+              ? 'bg-[rgba(79,91,107,.05)]'
+              : 'hover:bg-[rgba(79,91,107,.05)]'
+          return (
+            <button
+              key={`${item.section}-${token}-${i}`}
+              type="button"
+              role="option"
+              aria-selected={isActive ? 'true' : 'false'}
+              data-idx={i}
+              data-token={token}
+              class={`flex items-center justify-between gap-[11px] w-full text-left px-[10px] py-[9px] rounded-[6px] transition-colors ${bgClass}`}
+              onMouseEnter={() => setActiveIdx(i)}
+              onMouseDown={(e: Event) => e.preventDefault()}
+              onClick={() => commitItem(item)}
+            >
+              <span class="flex items-center gap-2 min-w-0">
+                {item.section === 'recent' && (
+                  <span class="font-mono font-semibold text-[8.5px] uppercase tracking-[.06em] leading-none text-fg-subtler shrink-0">
+                    recent
+                  </span>
+                )}
+                {item.section === 'common' && (
+                  <span class="font-mono font-semibold text-[8.5px] uppercase tracking-[.06em] leading-none text-fg-subtler shrink-0">
+                    common
+                  </span>
+                )}
+                <span class="font-mono font-semibold text-[13px] leading-none text-fg truncate">
+                  {label}
+                </span>
+              </span>
+              {showTokenSuffix && (
+                <span class="font-sans font-medium text-[11px] leading-none text-fg-muted shrink-0">
+                  {token}
+                </span>
+              )}
+            </button>
+          )
+        }
+        return (
+          <button
+            key={`${item.section}-${token}-${i}`}
+            type="button"
+            role="option"
+            aria-selected={isActive ? 'true' : 'false'}
+            data-idx={i}
+            data-token={token}
+            class={`flex items-center justify-between w-full text-left px-3 py-1 text-sm font-mono ${
+              isActive ? 'bg-accent text-accent-fg' : 'text-fg hover:bg-surface-3'
+            }`}
+            onMouseEnter={() => setActiveIdx(i)}
+            onMouseDown={(e: Event) => e.preventDefault()}
+            onClick={() => commitItem(item)}
+          >
+            <span class="flex items-center gap-2">
+              {item.section === 'recent' && (
+                <span class="text-[9px] text-emerald-400 uppercase">recent</span>
+              )}
+              {item.section === 'common' && (
+                <span class="text-[9px] text-fg-subtle uppercase">common</span>
+              )}
+              <span>{label}</span>
+            </span>
+            {showTokenSuffix && <span class="text-fg-subtle text-xs">{token}</span>}
+          </button>
+        )
+      })}
+    </div>
+  ) : null
+
+  const trigger = (
+    <input
+      ref={inputRef}
+      type="text"
+      class={
+        dockField
+          ? 'flex-1 min-w-0 border-none outline-none bg-transparent font-mono font-semibold text-[13px] leading-none text-fg'
+          : 'w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg font-mono'
+      }
+      value={query}
+      placeholder={placeholder ?? 'type to search (e.g. lang, scroll, A)'}
+      aria-label={ariaLabel}
+      onFocus={() => setOpen(true)}
+      onInput={(e: Event) => {
+        const v = (e.target as HTMLInputElement).value
+        setQuery(v)
+        setOpen(true)
+        setActiveIdx(0)
+      }}
+      onBlur={() => {
+        const trimmed = query.trim()
+        if (trimmed && trimmed !== baseToken) {
+          const matches = searchKeycodesRanked(trimmed)
+          const resolved = matches.length > 0 ? matches[0].token : trimmed
+          setBaseToken(resolved)
+          setQuery(resolved)
+          composeAndEmit(resolved, modWraps)
+        }
+        setTimeout(() => {
+          if (skipBlurCloseRef.current) {
+            skipBlurCloseRef.current = false
+            return
+          }
+          setOpen(false)
+        }, 120)
+      }}
+      onKeyDown={handleKeyDown}
+    />
+  )
+
+  if (dockField) {
+    return (
+      <DockField label={fieldLabel} active={open} overlay={popover}>
+        {trigger}
+        <span
+          class="text-[10px] leading-none text-fg-subtler cursor-pointer"
+          aria-hidden="true"
+          onMouseDown={(e: Event) => {
+            e.preventDefault()
+            skipBlurCloseRef.current = true
+            setOpen((cur) => !cur)
+            inputRef.current?.focus()
+          }}
+        >
+          ▾
+        </span>
+      </DockField>
+    )
+  }
+
+  return (
+    <div class="relative">
+      {!pinModifiers && !hideModifiers && (
+        <ModifierToggles active={modWraps} onChange={handleModifierChange} />
+      )}
+      {trigger}
+      {popover}
+      {!pinModifiers && !hideModifiers && modWraps.size > 0 && (
         <div class="mt-1 text-[10px] text-fg-subtle">
           Will save as: <span class="text-fg-muted">{applyModifiersOrdered(baseToken, modWraps)}</span>
         </div>

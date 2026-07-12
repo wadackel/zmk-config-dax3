@@ -1,22 +1,26 @@
 import { useState } from 'hono/jsx'
 import { useEditor } from '../../lib/editor-state/context'
-import type { BindingChain, LayerData } from '../../lib/keymap-dt/types'
-import { describeEncoderRotation } from '../../lib/sensor-hints'
-import { BindingInspector } from './inspector/binding-inspector'
-import { SensorTuningInspector } from './inspector/sensor-tuning-inspector'
+import type { BindingChain } from '../../lib/keymap-dt/types'
+import {
+  describeEncoderRotation,
+  SHIELD_TRIGGERS_PER_ROTATION,
+} from '../../lib/sensor-hints'
+import { BindingDock } from './inspector/binding-inspector'
+import { SensorTuningDock } from './inspector/sensor-tuning-inspector'
 import { EncoderDial } from './sensors/encoder-dial'
 import { LayerSelectorColumn } from './sensors/layer-selector-column'
+import { DockShell } from '../../components/editor/dock-shell'
 
 const ENCODER_LABELS = ['left', 'right']
 
-type EditingTarget = { encoderIdx: 0 | 1 }
+type EditingTarget = { encoderIdx: 0 | 1; direction: 'ccw' | 'cw' }
 
 /**
- * Sensors tab. Three-column shell mirroring Layers:
+ * Sensors tab. Two-column shell + bottom dock:
  *   - Left: LayerSelectorColumn (which layer's sensor-bindings to edit)
  *   - Center: encoder pill selector + CCW card / EncoderDial / CW card
- *   - Right: SensorTuningInspector by default; swapped for the binding
- *     editor when CCW/CW is clicked.
+ *   - Bottom dock: SensorTuningDock by default (tuning fields);
+ *     swapped for the BindingDock dock variant when CCW/CW is clicked.
  *
  * The dial is decorative; interactions happen on the CCW/CW cards. Selecting
  * a layer without sensor-bindings surfaces an "Add sensor-bindings" prompt
@@ -45,10 +49,11 @@ export function SensorsTab() {
   }
 
   return (
-    <div class="flex-1 min-h-0 min-w-0 flex bg-surface-0">
-      <LayerSelectorColumn />
+    <div class="flex-1 min-h-0 min-w-0 flex flex-col bg-surface-0">
+      <div class="flex-1 min-h-0 flex overflow-hidden">
+        <LayerSelectorColumn />
 
-      <div class="flex-1 bg-surface-3 flex flex-col min-w-0 overflow-auto">
+        <div class="flex-1 bg-surface-3 flex flex-col min-w-0 overflow-auto">
         <EncoderPillSelector
           selected={selectedEncoder}
           onSelect={setSelectedEncoder}
@@ -66,8 +71,12 @@ export function SensorsTab() {
             <RotationCard
               direction="ccw"
               chain={bindings[selectedEncoder]!}
-              isEditing={editing?.encoderIdx === selectedEncoder}
-              onClick={() => setEditing({ encoderIdx: selectedEncoder })}
+              isEditing={
+                editing?.encoderIdx === selectedEncoder && editing?.direction === 'ccw'
+              }
+              onClick={() =>
+                setEditing({ encoderIdx: selectedEncoder, direction: 'ccw' })
+              }
             />
 
             <div class="flex flex-col items-center gap-3">
@@ -76,8 +85,8 @@ export function SensorsTab() {
                 label={ENCODER_LABELS[selectedEncoder]}
                 layerIdx={state.activeLayerIdx}
               />
-              <span class="text-[11px] text-fg-muted">
-                Rotation preview · {selectedEncoder === 0 ? 'left' : 'right'} encoder
+              <span class="text-[11px] font-medium leading-none text-fg-subtle">
+                Rotation preview · {SHIELD_TRIGGERS_PER_ROTATION} triggers / rotation
               </span>
               <button
                 type="button"
@@ -88,7 +97,7 @@ export function SensorsTab() {
                     encoderIdx: selectedEncoder,
                   })
                 }
-                class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-border bg-surface-0 text-[12px] text-fg-muted hover:text-fg hover:bg-surface-2 transition-colors"
+                class="inline-flex items-center gap-[7px] px-[14px] py-[8px] rounded-full border border-[rgba(22,24,29,.14)] bg-white text-[12px] font-medium leading-none text-fg-muted hover:text-fg hover:bg-surface-2 transition-colors"
               >
                 ⇄ Swap CCW / CW
               </button>
@@ -97,24 +106,33 @@ export function SensorsTab() {
             <RotationCard
               direction="cw"
               chain={bindings[selectedEncoder]!}
-              isEditing={editing?.encoderIdx === selectedEncoder}
-              onClick={() => setEditing({ encoderIdx: selectedEncoder })}
+              isEditing={
+                editing?.encoderIdx === selectedEncoder && editing?.direction === 'cw'
+              }
+              onClick={() =>
+                setEditing({ encoderIdx: selectedEncoder, direction: 'cw' })
+              }
             />
           </div>
         )}
       </div>
 
-      {editing !== null && editingChain ? (
-        <BindingInspector
-          targetLabel={`Encoder ${editing.encoderIdx} · ${ENCODER_LABELS[editing.encoderIdx]}`}
-          targetSubtitle={`layer ${state.activeLayerIdx} · ${activeLayer?.name ?? ''}`}
-          initial={editingChain}
-          onCancel={() => setEditing(null)}
-          onCommit={commitBinding}
-        />
-      ) : (
-        <SensorTuningInspector />
-      )}
+      </div>
+
+      <DockShell ariaLabel="Sensor tuning">
+        {editing !== null && editingChain ? (
+          <BindingDock
+            key={`enc-${editing.encoderIdx}-l${state.activeLayerIdx}`}
+            targetLabel={`Encoder ${editing.encoderIdx} · ${ENCODER_LABELS[editing.encoderIdx]}`}
+            targetSubtitle={`layer ${state.activeLayerIdx} · ${activeLayer?.name ?? ''}`}
+            initial={editingChain}
+            onCancel={() => setEditing(null)}
+            onCommit={commitBinding}
+          />
+        ) : (
+          <SensorTuningDock encoderIdx={selectedEncoder} />
+        )}
+      </DockShell>
     </div>
   )
 }
@@ -131,7 +149,7 @@ function EncoderPillSelector({
     { idx: 1, label: 'Encoder 1 · right' },
   ]
   return (
-    <div role="radiogroup" aria-label="Encoder selection" class="flex items-center gap-2 px-8 pt-4">
+    <div role="radiogroup" aria-label="Encoder selection" class="flex items-center gap-[9px] px-8 pt-4">
       {items.map((it) => {
         const active = selected === it.idx
         return (
@@ -143,19 +161,19 @@ function EncoderPillSelector({
             tabIndex={active ? 0 : -1}
             onClick={() => onSelect(it.idx)}
             class={[
-              'inline-flex items-center gap-2 px-4 py-2 rounded-full text-[12.5px] transition-colors',
+              'inline-flex items-center gap-2 px-[15px] py-[8px] rounded-full text-[12.5px] leading-none transition-colors',
               active
-                ? 'bg-ink text-ink-fg font-semibold'
-                : 'bg-surface-0 border border-border text-fg-muted hover:text-fg hover:bg-surface-2',
+                ? 'bg-[#16181d] text-white font-semibold'
+                : 'bg-white border border-[rgba(22,24,29,.14)] text-fg-muted font-medium hover:text-fg hover:bg-surface-2',
             ].join(' ')}
           >
             <span
               aria-hidden="true"
               class={[
-                'w-3.5 h-3.5 border-2 rounded-full inline-block',
+                'w-[14px] h-[14px] border-2 rounded-full inline-block',
                 active
-                  ? 'border-[color:var(--color-ink-fg)]/50 border-t-[color:var(--color-ink-fg)]'
-                  : 'border-border-strong border-t-fg-subtle',
+                  ? 'border-white/50 border-t-white'
+                  : 'border-[#c9ccd2] border-t-[#9096a0]',
               ].join(' ')}
             />
             {it.label}
@@ -214,26 +232,30 @@ function RotationCard({ direction, chain, isEditing, onClick }: RotationCardProp
       type="button"
       onClick={onClick}
       class={[
-        'w-[212px] flex-none bg-surface-0 border rounded-xl overflow-hidden shadow-[var(--shadow-key)] text-left transition-shadow',
+        'w-[212px] flex-none bg-white rounded-[9px] overflow-hidden text-left transition-shadow border box-border',
         isEditing
-          ? 'border-2 border-accent shadow-[var(--shadow-focus-ring)]'
-          : 'border-border hover:shadow-[var(--shadow-key-hover)]',
+          ? 'border-[1.5px] border-accent shadow-[0_0_0_3px_rgba(79,91,107,.12)]'
+          : 'border-[rgba(22,24,29,.12)] shadow-[0_1px_2px_rgba(22,24,29,.05)] hover:shadow-md',
       ].join(' ')}
     >
-      <div class="flex items-center gap-2 px-3.5 py-3 border-b border-border-subtle">
-        <span class="text-[15px] font-mono font-semibold text-fg">{symbol}</span>
-        <span class="text-[12.5px] font-semibold text-fg">{label}</span>
-        <span class="ml-auto text-[10.5px] text-fg-subtle">
+      <div class="flex items-center gap-2 px-[14px] py-[12px] border-b border-[rgba(22,24,29,.07)]">
+        <span class="text-[15px] font-mono font-semibold text-fg leading-none">{symbol}</span>
+        <span class="text-[12.5px] font-semibold text-fg leading-none">{label}</span>
+        <span class="ml-auto text-[10.5px] font-medium text-fg-subtle leading-none">
           {direction === 'ccw' ? 'counter-clockwise' : 'clockwise'}
         </span>
       </div>
-      <div class="p-3.5 flex flex-col gap-2">
-        <span class="text-[10.5px] text-fg-subtle">Binding</span>
-        <span class="flex items-center justify-between px-3 py-2.5 border border-border rounded-lg bg-surface-3 font-mono text-[13.5px] font-semibold text-fg">
-          <span>{displayTokens}</span>
-          <span class="text-fg-subtle text-[11px]">▾</span>
+      <div class="p-[14px] flex flex-col gap-[9px]">
+        <span class="text-[10.5px] font-medium text-fg-subtle leading-none">Binding</span>
+        <span class="flex items-center justify-between px-[12px] py-[11px] border border-[rgba(22,24,29,.14)] rounded-[6px] bg-[rgba(22,24,29,.03)]">
+          <span class="truncate font-mono font-semibold text-[13.5px] leading-none text-fg">
+            {displayTokens}
+          </span>
+          <span class="text-[11px] leading-none text-fg-subtler shrink-0 ml-2" aria-hidden="true">
+            ▾
+          </span>
         </span>
-        {hint && <span class="text-[11px] text-fg-subtle">{hint}</span>}
+        {hint && <span class="text-[11px] font-medium text-fg-subtle leading-[1.5]">{hint}</span>}
       </div>
     </button>
   )

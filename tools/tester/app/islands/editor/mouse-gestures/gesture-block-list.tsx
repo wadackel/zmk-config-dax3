@@ -17,9 +17,9 @@ export function GestureBlockList({ blocks, activeIdx, onSelect }: GestureBlockLi
   return (
     <aside
       aria-label="Gesture blocks"
-      class="w-[210px] flex-none border-r border-border-subtle p-4 flex flex-col gap-1 overflow-auto"
+      class="w-[210px] flex-none border-r border-border-subtle px-[14px] py-[16px] flex flex-col gap-[4px] overflow-auto"
     >
-      <span class="text-[10.5px] font-mono font-semibold tracking-wider text-fg-subtle px-1.5 pb-2">
+      <span class="text-[10.5px] font-mono font-semibold tracking-[.08em] leading-none uppercase text-fg-subtle px-[6px] pb-[8px]">
         GESTURE BLOCKS
       </span>
       {blocks.map((block, i) => {
@@ -33,13 +33,13 @@ export function GestureBlockList({ blocks, activeIdx, onSelect }: GestureBlockLi
             aria-current={isActive ? 'true' : undefined}
             onClick={() => onSelect(i)}
             class={[
-              'flex flex-col gap-1 px-2.5 py-2.5 rounded-lg cursor-pointer transition-colors text-left',
-              isActive ? 'bg-ink text-ink-fg' : 'hover:bg-surface-3',
+              'flex flex-col gap-[3px] px-[10px] py-[9px] rounded-[6px] cursor-pointer transition-colors text-left',
+              isActive ? 'bg-[#16181d] text-white' : 'hover:bg-surface-3',
             ].join(' ')}
           >
             <span
               class={[
-                'text-[12.5px] font-mono font-semibold truncate',
+                'text-[12.5px] font-mono font-semibold leading-none truncate',
                 isActive ? '' : 'text-fg-muted',
               ].join(' ')}
             >
@@ -47,8 +47,8 @@ export function GestureBlockList({ blocks, activeIdx, onSelect }: GestureBlockLi
             </span>
             <span
               class={[
-                'text-[10px]',
-                isActive ? 'text-[color:var(--color-ink-fg)]/60' : 'text-fg-subtle',
+                'text-[10px] font-medium leading-none',
+                isActive ? 'text-white/55' : 'text-fg-subtle',
               ].join(' ')}
             >
               {subtitle}

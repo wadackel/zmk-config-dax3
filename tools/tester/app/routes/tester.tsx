@@ -7,15 +7,12 @@ export default createRoute((c) => {
   // (encoder row + 46 keys + event log) can exceed the viewport on shorter
   // screens; wrap the route in an internal scroll container to preserve
   // access to the full log.
+  //
+  // Cross-mode navigation lives in the icon rail rendered by
+  // {@link KeyboardTester}; no dev-only "Back to editor" banner is
+  // needed because the rail's editor tab items already link to `/`.
   return c.render(
-    <div class="h-screen overflow-auto">
-      {import.meta.env.DEV && (
-        <div class="px-4 py-2 text-xs font-mono text-fg-muted border-b border-border-subtle">
-          <a class="hover:text-fg" href="/">
-            <span aria-hidden="true">←</span> Back to keymap editor
-          </a>
-        </div>
-      )}
+    <div class="h-screen overflow-hidden">
       <KeyboardTester />
     </div>,
   )

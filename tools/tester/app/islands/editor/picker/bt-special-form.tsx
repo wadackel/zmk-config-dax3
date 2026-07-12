@@ -4,6 +4,7 @@
 // in one place.
 
 import { useEffect } from 'hono/jsx'
+import { DockField } from '../../../components/editor/dock-field'
 
 type Props = {
   /** Full chain including the leading `&bt`, e.g. `['&bt', 'BT_SEL', '1']` or `['&bt', 'BT_NXT']`. */
@@ -57,8 +58,7 @@ export function BtSpecialForm({ tokens, onChange }: Props) {
   }, [synced])
 
   return (
-    <div class="mb-4">
-      <label class="block mb-2 text-fg-muted text-xs">Bluetooth action</label>
+    <DockField label="BLUETOOTH ACTION">
       {/*
         hono/jsx/dom applies `select.value` before <option> children are
         appended, which strands non-default selections at selectedIndex 0.
@@ -66,7 +66,7 @@ export function BtSpecialForm({ tokens, onChange }: Props) {
         per-option DOM creation and survives the append order.
       */}
       <select
-        class="w-full bg-surface-3 border border-border-strong rounded-md px-2 py-1 text-fg"
+        class="flex-1 min-w-0 border-none outline-none bg-transparent font-mono font-semibold text-[13px] leading-none text-fg cursor-pointer"
         onChange={(e: Event) => {
           const v = (e.target as HTMLSelectElement).value as OptionValue
           onChange(btOptionToTokens(v))
@@ -78,6 +78,6 @@ export function BtSpecialForm({ tokens, onChange }: Props) {
           </option>
         ))}
       </select>
-    </div>
+    </DockField>
   )
 }

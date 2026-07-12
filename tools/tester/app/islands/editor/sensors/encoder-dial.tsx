@@ -24,41 +24,27 @@ export function EncoderDial({
 }: EncoderDialProps) {
   return (
     <div class="relative w-[190px] h-[190px]">
-      {/* outer body */}
       <div
-        class="absolute inset-0 rounded-full border border-border shadow-[0_8px_26px_rgb(22_24_29/0.13),inset_0_1px_0_#fff]"
+        class="absolute inset-0 rounded-full border border-[rgba(22,24,29,.12)] shadow-[0_8px_26px_rgb(22_24_29/0.13),inset_0_1px_0_#fff]"
         style="background: radial-gradient(circle at 50% 42%, #ffffff, #eef0f4);"
       />
-      {/* dashed tick ring */}
       <div
         class={[
-          'absolute inset-[16px] rounded-full border-2 border-dashed border-border',
+          'absolute inset-[16px] rounded-full border-2 border-dashed border-[rgba(22,24,29,.14)]',
           animate ? 'animate-[dax3-spin-cw_11s_linear_infinite]' : '',
         ].join(' ')}
       />
-      {/* inner cap */}
-      <div class="absolute inset-[44px] rounded-full bg-ink flex flex-col items-center justify-center gap-1 shadow-[inset_0_-3px_8px_rgb(0_0_0/0.35)]">
-        <span class="text-[9px] font-mono font-semibold tracking-[.12em] text-[color:var(--color-ink-fg)]/50">
+      <div class="absolute inset-[44px] rounded-full bg-[#16181d] flex flex-col items-center justify-center gap-[3px] shadow-[inset_0_-3px_8px_rgba(0,0,0,.35)]">
+        <span class="text-[9px] font-mono font-semibold tracking-[.12em] text-white/50 leading-none">
           ENC {encoderIdx}
         </span>
         {label && (
-          <span class="text-[13px] font-semibold text-[color:var(--color-ink-fg)]">
-            {label}
-          </span>
+          <span class="text-[13px] font-semibold text-white leading-none">{label}</span>
         )}
         {layerIdx !== undefined && (
-          <span class="text-[9px] font-mono text-[color:var(--color-ink-fg)]/40">
-            layer {layerIdx}
-          </span>
+          <span class="text-[9px] font-mono text-white/40 leading-none">layer {layerIdx}</span>
         )}
       </div>
-      {/* CW arrow indicator */}
-      <span
-        aria-hidden="true"
-        class="absolute -top-0.5 right-3.5 text-[20px] font-mono font-semibold text-accent"
-      >
-        ↻
-      </span>
     </div>
   )
 }

@@ -1,11 +1,10 @@
 import { useState } from 'hono/jsx'
-import { Button } from '../../../components/ui/button'
 import { CommittingTextInput } from '../../../components/ui/field'
-import { InspectorShell } from '../../../components/editor/inspector-shell'
-import { BindingInspector } from './binding-inspector'
+import { CombosIcon } from '../../../components/editor/nav-icons'
+import { BindingDock } from './binding-inspector'
 import type { BindingChain, ComboEntry, LayerData } from '../../../lib/keymap-dt/types'
 
-export type ComboInspectorProps = {
+export type ComboDockProps = {
   combo: ComboEntry
   layers: LayerData[]
   pickMode: boolean
@@ -16,19 +15,22 @@ export type ComboInspectorProps = {
 }
 
 /**
- * Right-panel Combo editor. Sections:
- *   - Name (CommittingTextInput — DT identifier)
- *   - Binding (click-through to a nested BindingInspector)
- *   - Key positions (chips + "Add positions" toggle that puts the board
- *     into pick-mode where clicking a key toggles it into `keyPositions`)
- *   - Target layers (pill toggle group; empty selection = active on every
- *     layer, matching ZMK's default)
+ * Bottom-dock Combo editor. Fields flow horizontally:
+ *   - Identity (icon + combo name + Delete link + summary) — left
+ *   - Name, Binding trigger, Key positions chips, Target layers — center
+ *   - No explicit action buttons (auto-committed via onChange) — right slot
+ *     left empty so the DockShell divider still frames the row.
  *
  * `timeout-ms` and `require-prior-idle-ms` are absent by design: our
  * parser/serializer does not round-trip those properties yet, so the
- * inspector avoids exposing values the reducer would silently drop.
+ * dock avoids exposing values the reducer would silently drop.
+ *
+ * When the user clicks the Binding button we swap in a `BindingDock`
+ * (dock variant) that reuses the parent DockShell — the caller checks the
+ * `editingBinding` state via a render-prop-shaped return to decide which
+ * body to draw.
  */
-export function ComboInspector({
+export function ComboDock({
   combo,
   layers,
   pickMode,
@@ -36,7 +38,7 @@ export function ComboInspector({
   onRemove,
   onEnterPickMode,
   onExitPickMode,
-}: ComboInspectorProps) {
+}: ComboDockProps) {
   const [editingBinding, setEditingBinding] = useState(false)
 
   const commitBinding = (chain: BindingChain) => {
@@ -46,7 +48,8 @@ export function ComboInspector({
 
   if (editingBinding) {
     return (
-      <BindingInspector
+      <BindingDock
+        key={`combo-${combo.name}`}
         targetLabel={`${combo.name} binding`}
         targetSubtitle={`pos ${combo.keyPositions.join(',')}`}
         initial={combo.bindings}
@@ -57,59 +60,77 @@ export function ComboInspector({
   }
 
   const activeLayerSet = new Set(combo.layers)
+  const bindingSummary = combo.bindings.tokens.join(' ') || '&none'
+  const positionsSummary =
+    combo.keyPositions.length > 0 ? `pos ${combo.keyPositions.join(',')}` : 'no positions'
 
   return (
-    <InspectorShell
-      title="Combo"
-      ariaLabel="Combo editor"
-      headerRight={
-        <button
-          type="button"
-          onClick={onRemove}
-          class="text-[11px] font-mono text-danger hover:brightness-95"
-        >
-          Delete
-        </button>
-      }
-      footer={
-        <Button size="sm" variant="primary" disabled>
-          Auto-saved
-        </Button>
-      }
-    >
-      <>
-        <div class="flex flex-col gap-2">
-          <span class="text-[12px] font-semibold text-fg-muted">Name</span>
+    <div class="contents">
+      <div class="flex-none flex items-center gap-3 pr-5 border-r border-border-subtle">
+        <div class="w-[46px] h-[46px] flex-none flex items-center justify-center rounded-input bg-accent-soft border border-accent text-accent [&_svg]:w-[22px] [&_svg]:h-[22px]">
+          <CombosIcon />
+        </div>
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center gap-2">
+            <span class="text-[13px] font-mono font-semibold text-fg">{combo.name}</span>
+            <button
+              type="button"
+              onClick={onRemove}
+              class="text-[11px] font-mono text-danger hover:brightness-95"
+            >
+              Delete
+            </button>
+          </div>
+          <span class="text-[11px] font-mono text-fg-subtle whitespace-nowrap">
+            {bindingSummary} · {positionsSummary}
+          </span>
+        </div>
+      </div>
+
+      <div class="flex-1 min-w-0 flex flex-wrap items-end gap-4 px-5">
+        <div class="flex flex-col gap-1.5 min-w-[140px] max-w-[180px]">
+          <span class="font-mono font-semibold text-[9px] leading-none uppercase tracking-[.06em] text-fg-subtle">
+            NAME
+          </span>
           <CommittingTextInput
-            class="font-mono"
+            class="font-mono !py-2 !text-[13px]"
+            aria-label="Combo name"
             value={combo.name}
             onCommit={(name) => onChange({ ...combo, name })}
           />
         </div>
 
-        <div class="flex flex-col gap-2">
-          <span class="text-[12px] font-semibold text-fg-muted">Binding</span>
+        <div class="flex flex-col gap-1.5 min-w-[140px] max-w-[200px]">
+          <span class="font-mono font-semibold text-[9px] leading-none uppercase tracking-[.06em] text-fg-subtle">
+            BINDING
+          </span>
           <button
             type="button"
             onClick={() => setEditingBinding(true)}
-            class="flex items-center justify-between px-3 py-2.5 border border-border rounded-lg bg-surface-0 text-[13.5px] font-mono font-semibold text-fg hover:bg-surface-2 transition-colors"
+            aria-label={`Edit combo binding: ${bindingSummary}`}
+            class="flex items-center justify-between px-3 py-2 border border-border rounded-input bg-surface-0 text-[13px] font-mono font-semibold text-fg hover:bg-surface-2 transition-colors"
           >
-            <span>{combo.bindings.tokens.join(' ') || '&none'}</span>
-            <span class="text-fg-subtle text-[11px]">▾</span>
+            <span class="truncate">{bindingSummary}</span>
+            <span
+              class="text-fg-subtle text-[10px] pl-2 tracking-wider"
+              aria-hidden="true"
+            >
+              EDIT
+            </span>
           </button>
         </div>
 
-        <div class="flex flex-col gap-2">
-          <span class="text-[12px] font-semibold text-fg-muted">
-            Key positions <span class="text-fg-subtle">({combo.keyPositions.length})</span>
+        <div class="flex flex-col gap-1.5 min-w-[160px]">
+          <span class="font-mono font-semibold text-[9px] leading-none uppercase tracking-[.06em] text-fg-subtle">
+            KEY POSITIONS ({combo.keyPositions.length})
           </span>
-          <div class="flex flex-wrap gap-1.5">
+          <div class="flex items-center gap-1.5 flex-wrap">
             {combo.keyPositions.map((pos) => (
               <span
                 key={pos}
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent-soft border border-accent font-mono text-[12px] font-semibold text-accent"
+                class="inline-flex items-center gap-1 px-2 py-1 rounded-input bg-accent-soft border border-accent font-mono text-[11px] font-semibold text-accent"
               >
-                pos {pos}
+                {pos}
                 <button
                   type="button"
                   onClick={() =>
@@ -129,30 +150,31 @@ export function ComboInspector({
               type="button"
               onClick={pickMode ? onExitPickMode : onEnterPickMode}
               class={[
-                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-mono text-[12px] transition-colors',
+                'inline-flex items-center gap-1 px-2 py-1 rounded-input border font-mono text-[11px] transition-colors',
                 pickMode
                   ? 'bg-accent text-accent-fg border-accent'
-                  : 'border-dashed border-border-strong text-fg-subtle hover:text-fg hover:border-border-strong',
+                  : 'border-dashed border-border-strong text-fg-subtle hover:text-fg',
               ].join(' ')}
             >
-              {pickMode ? 'Done picking' : '+ Add'}
+              {pickMode ? 'Done' : '+ Pick'}
             </button>
           </div>
-          <span class="text-[10.5px] text-fg-subtle leading-snug">
-            {pickMode
-              ? 'Click keys on the board to toggle positions. Esc to exit.'
-              : 'Click "+ Add" to enter board pick mode.'}
-          </span>
         </div>
 
-        <div class="flex flex-col gap-2">
-          <span class="text-[12px] font-semibold text-fg-muted">Target layers</span>
-          <div role="group" aria-label="Target layers" class="flex flex-wrap gap-1.5">
+        <div class="flex flex-col gap-1.5 min-w-[180px]">
+          <span class="font-mono font-semibold text-[9px] leading-none uppercase tracking-[.06em] text-fg-subtle">
+            TARGET LAYERS
+          </span>
+          <div
+            role="group"
+            aria-label="Target layers"
+            class="flex flex-wrap gap-1"
+          >
             {layers.map((l, i) => {
               const isActive = activeLayerSet.has(i)
               return (
                 <button
-                  key={l.name}
+                  key={i}
                   type="button"
                   aria-pressed={isActive ? 'true' : 'false'}
                   aria-label={`Layer ${i} ${l.name}`}
@@ -166,7 +188,7 @@ export function ComboInspector({
                     })
                   }}
                   class={[
-                    'px-2.5 py-1 rounded-lg font-mono text-[11.5px] font-semibold transition-colors',
+                    'px-2 py-1 rounded-input font-mono text-[11px] font-semibold transition-colors',
                     isActive
                       ? 'bg-ink text-ink-fg'
                       : 'border border-border bg-surface-0 text-fg-subtle hover:text-fg hover:bg-surface-2',
@@ -179,16 +201,14 @@ export function ComboInspector({
             <button
               type="button"
               onClick={() => onChange({ ...combo, layers: [] })}
-              class="px-2.5 py-1 rounded-lg border border-dashed border-border-strong bg-transparent font-mono text-[11.5px] text-fg-subtle hover:text-fg"
+              class="px-2 py-1 rounded-input border border-border bg-surface-0 font-mono text-[11px] text-fg-muted hover:text-fg hover:bg-surface-2"
+              title="Clear selection — combo active on every layer"
             >
-              all
+              Any
             </button>
           </div>
-          <span class="text-[10.5px] text-fg-subtle leading-snug">
-            Empty means enabled on every layer
-          </span>
         </div>
-      </>
-    </InspectorShell>
+      </div>
+    </div>
   )
 }

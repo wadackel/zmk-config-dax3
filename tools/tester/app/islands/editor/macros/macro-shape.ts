@@ -3,7 +3,7 @@ import { getBehavior } from '../../../lib/picker'
 
 /**
  * A macro chain is "simple" — safely round-trippable through the
- * BindingInspector — only when it references exactly one behaviour AND
+ * BindingDock — only when it references exactly one behaviour AND
  * that behaviour's arity matches the current token count. Macros permit
  * shorthand like `<&kp ESCAPE &kp LANG2>` (two behaviours in one
  * angle-bracket group), and user-defined behaviours (`&my_thing ARG1 ARG2`)

@@ -11,28 +11,19 @@ export interface KeyState {
   isPressed: boolean
 }
 
-export interface EncoderState {
-  clockwiseCount: number
-  counterClockwiseCount: number
-  lastEventTime: number
-  isTested: boolean
-}
-
 export interface EventLogEntry {
   id: number
   timestamp: number
-  type: 'keydown' | 'keyup' | 'mousedown' | 'mouseup' | 'wheel'
+  type: 'keydown' | 'keyup' | 'mousedown' | 'mouseup'
   label: string
   isChattering: boolean
-  chatterInterval?: number
 }
 
 export interface TestState {
   keys: Map<number, KeyState>
-  encoders: Map<string, EncoderState>
   eventLog: EventLogEntry[]
   testedCount: number
-  focusedEncoder: string | null
+  lastKeyIndex: number | null
   logIdCounter: number
 }
 
@@ -40,7 +31,7 @@ export function createInitialState(): TestState {
   const keys = new Map<number, KeyState>()
   for (const key of KEYS) {
     keys.set(key.index, {
-      status: key.testability === 'untestable' ? 'untested' : 'untested',
+      status: 'untested',
       pressCount: 0,
       chatterCount: 0,
       lastKeydownTime: 0,
@@ -49,26 +40,11 @@ export function createInitialState(): TestState {
     })
   }
 
-  const encoders = new Map<string, EncoderState>()
-  encoders.set('left', {
-    clockwiseCount: 0,
-    counterClockwiseCount: 0,
-    lastEventTime: 0,
-    isTested: false,
-  })
-  encoders.set('right', {
-    clockwiseCount: 0,
-    counterClockwiseCount: 0,
-    lastEventTime: 0,
-    isTested: false,
-  })
-
   return {
     keys,
-    encoders,
     eventLog: [],
     testedCount: 0,
-    focusedEncoder: null,
+    lastKeyIndex: null,
     logIdCounter: 0,
   }
 }

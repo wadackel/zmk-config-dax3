@@ -16,7 +16,7 @@ export function ComboList({ combos, activeIdx, onSelect, onAdd }: ComboListProps
   return (
     <aside
       aria-label="Combos"
-      class="w-[236px] flex-none border-r border-border-subtle p-4 flex flex-col gap-1 overflow-auto"
+      class="w-[190px] flex-none border-r border-border-subtle p-4 flex flex-col gap-1 overflow-auto"
     >
       <div class="flex items-center justify-between px-1.5 pb-2">
         <span class="text-[10.5px] font-mono font-semibold tracking-wider text-fg-subtle">

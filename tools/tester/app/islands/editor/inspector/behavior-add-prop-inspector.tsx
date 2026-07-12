@@ -1,10 +1,9 @@
 import { useState } from 'hono/jsx'
 import { Button } from '../../../components/ui/button'
 import { CommittingTextInput, TextInput } from '../../../components/ui/field'
-import { InspectorShell } from '../../../components/editor/inspector-shell'
 import type { PropSchema } from '../../../lib/behavior-prop-schema'
 
-export type BehaviorAddPropInspectorProps = {
+export type BehaviorAddPropDockProps = {
   suggestions: PropSchema[]
   onAddKnown: (schema: PropSchema) => void
   onAddCustom: (name: string, value: string) => void
@@ -19,16 +18,18 @@ const KIND_BADGE_LABEL: Record<string, string> = {
 }
 
 /**
- * Right-panel picker for adding new props to the currently-selected
- * behaviour. Lists unused schema-known props with their type badge
- * (int-ms / enum / bool / raw) at the top, then a "custom (raw)" section
- * for any DT prop we don't have a schema for.
+ * Bottom-dock "Add property" editor. Layout:
+ *   - Identity (left): label + subtitle explaining schema vs raw.
+ *   - Center: search input, SUGGESTED chip row, and a "+ Custom (raw)"
+ *     `<details>` for hand-written prop entry.
+ *   - Actions (right): Add button used only for the custom raw form —
+ *     schema-known chips add themselves on click.
  */
-export function BehaviorAddPropInspector({
+export function BehaviorAddPropDock({
   suggestions,
   onAddKnown,
   onAddCustom,
-}: BehaviorAddPropInspectorProps) {
+}: BehaviorAddPropDockProps) {
   const [query, setQuery] = useState('')
   const [customName, setCustomName] = useState('')
   const [customValue, setCustomValue] = useState('')
@@ -39,77 +40,83 @@ export function BehaviorAddPropInspector({
       )
     : suggestions
 
+  const submitCustom = () => {
+    const name = customName.trim()
+    if (!name) return
+    onAddCustom(name, customValue)
+    setCustomName('')
+    setCustomValue('')
+  }
+
   return (
-    <InspectorShell
-      title="Add property"
-      ariaLabel="Add property"
-      width={300}
-    >
-      <>
+    <div class="contents">
+      <div class="flex-none flex flex-col gap-1 pr-5 border-r border-border-subtle">
+        <span class="text-[13px] font-bold text-fg leading-none">Add property</span>
+        <span class="font-mono text-[10.5px] text-fg-subtle whitespace-nowrap">
+          schema-typed or raw
+        </span>
+      </div>
+
+      <div class="flex-1 min-w-0 flex items-center flex-wrap gap-3 px-5">
         <TextInput
           aria-label="Search property name"
           placeholder="Search property name…"
           value={query}
           onInput={(e: Event) => setQuery((e.target as HTMLInputElement).value)}
-          class="!py-2 !text-[12.5px]"
+          class="!py-2 !text-[12.5px] min-w-[160px] max-w-[240px] flex-1"
         />
+        <span class="font-mono text-[10px] uppercase tracking-[.04em] text-fg-subtle">
+          SUGGESTED
+        </span>
+        {filtered.length === 0 ? (
+          <span class="text-[11.5px] text-fg-subtle italic">No matches</span>
+        ) : (
+          filtered.slice(0, 6).map((s) => (
+            <button
+              key={s.name}
+              type="button"
+              onClick={() => onAddKnown(s)}
+              class="inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-border rounded-input bg-surface-0 hover:bg-surface-2 transition-colors"
+            >
+              <span class="font-mono font-semibold text-[12px] text-fg">{s.name}</span>
+              <span class="font-mono text-[9.5px] text-fg-subtle bg-surface-4 rounded-sm px-1.5 py-0.5">
+                {KIND_BADGE_LABEL[s.kind.type]}
+              </span>
+            </button>
+          ))
+        )}
+        <details class="ml-1">
+          <summary class="cursor-pointer inline-flex items-center px-2.5 py-1.5 border border-dashed border-border-strong rounded-input font-mono text-[11.5px] text-fg-subtle hover:text-fg select-none">
+            + Custom (raw)
+          </summary>
+          <div class="mt-2 flex items-center gap-2">
+            <CommittingTextInput
+              placeholder="name"
+              value={customName}
+              onCommit={setCustomName}
+              class="!py-1.5 !text-[12px] font-mono max-w-[140px]"
+            />
+            <CommittingTextInput
+              placeholder="value (e.g. <5>)"
+              value={customValue}
+              onCommit={setCustomValue}
+              class="!py-1.5 !text-[12px] font-mono max-w-[160px]"
+            />
+          </div>
+        </details>
+      </div>
 
-        <div class="flex flex-col gap-2">
-          {filtered.length === 0 ? (
-            <span class="text-[11.5px] text-fg-subtle">
-              No matching properties
-            </span>
-          ) : (
-            filtered.map((s) => (
-              <button
-                key={s.name}
-                type="button"
-                onClick={() => onAddKnown(s)}
-                class="flex items-center justify-between px-3 py-2.5 border border-border rounded-xl bg-surface-0 text-left hover:bg-surface-2 transition-colors"
-              >
-                <span class="text-[12.5px] font-mono font-semibold text-fg">
-                  {s.name}
-                </span>
-                <span class="text-[10px] font-mono text-fg-subtle bg-surface-4 rounded-md px-1.5 py-0.5">
-                  {KIND_BADGE_LABEL[s.kind.type]}
-                </span>
-              </button>
-            ))
-          )}
-
-          <details class="mt-2">
-            <summary class="cursor-pointer text-[11.5px] font-mono text-fg-subtle hover:text-fg select-none">
-              + Custom (raw)
-            </summary>
-            <div class="mt-2 flex flex-col gap-2">
-              <CommittingTextInput
-                placeholder="name"
-                value={customName}
-                onCommit={setCustomName}
-                class="!text-[12px] font-mono"
-              />
-              <CommittingTextInput
-                placeholder="value (e.g. <5>)"
-                value={customValue}
-                onCommit={setCustomValue}
-                class="!text-[12px] font-mono"
-              />
-              <Button
-                size="sm"
-                variant="primary"
-                disabled={!customName.trim()}
-                onClick={() => {
-                  onAddCustom(customName.trim(), customValue)
-                  setCustomName('')
-                  setCustomValue('')
-                }}
-              >
-                Add
-              </Button>
-            </div>
-          </details>
-        </div>
-      </>
-    </InspectorShell>
+      <div class="flex-none flex items-center pl-3">
+        <Button
+          size="sm"
+          variant="primary"
+          disabled={!customName.trim()}
+          onClick={submitCustom}
+          title="Add the custom (raw) property"
+        >
+          Add
+        </Button>
+      </div>
+    </div>
   )
 }

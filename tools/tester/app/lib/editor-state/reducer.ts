@@ -72,6 +72,51 @@ export function shiftLayerRefsOnRemove(draft: EditorDraft, removedIdx: number): 
 }
 
 /**
+ * Rewrites every macro-label reference in `draft` after a macro has been
+ * renamed. Bindings whose head token is `&<oldName>` are rewritten to
+ * `&<newName>`; every other chain is left untouched. Traversal covers the
+ * same surfaces as `shiftLayerRefsOnRemove` so no reference is missed.
+ */
+export function renameMacroRefs(
+  draft: EditorDraft,
+  oldName: string,
+  newName: string,
+): EditorDraft {
+  const oldRef = `&${oldName}`
+  const newRef = `&${newName}`
+  const renameChain = (chain: BindingChain): BindingChain => {
+    if (chain.tokens[0] !== oldRef) return chain
+    return { tokens: [newRef, ...chain.tokens.slice(1)] }
+  }
+  return {
+    ...draft,
+    layers: draft.layers.map((l) => ({
+      ...l,
+      bindings: l.bindings.map(renameChain),
+      sensorBindings: l.sensorBindings
+        ? { perEncoder: l.sensorBindings.perEncoder.map(renameChain) }
+        : null,
+    })),
+    combos: draft.combos.map((c) => ({
+      ...c,
+      bindings: renameChain(c.bindings),
+    })),
+    macros: draft.macros.map((m) => ({
+      ...m,
+      bindingsList: m.bindingsList.map(renameChain),
+    })),
+    behaviors: draft.behaviors.map((b) => ({
+      ...b,
+      bindings: b.bindings?.map(renameChain),
+    })),
+    mouseGestures: draft.mouseGestures.map((g) => ({
+      ...g,
+      entries: g.entries.map((e) => ({ ...e, bindings: renameChain(e.bindings) })),
+    })),
+  }
+}
+
+/**
  * Computes the `old → new` index mapping for a MOVE_LAYER (fromIdx → toIdx).
  * Layers between the two positions shift by ±1; layers outside the affected
  * range keep their index. Exported for tests and for MOVE_LAYER's own use.
@@ -475,6 +520,32 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       return mutateDraft(state, (d) => {
         d.macros = d.macros.filter((_, i) => i !== action.index)
       })
+
+    case 'RENAME_MACRO': {
+      const { index, name } = action
+      const trimmed = name.trim()
+      if (!trimmed) return state
+      if (index < 0 || index >= state.draft.macros.length) return state
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed)) return state
+      const currentName = state.draft.macros[index].name
+      if (trimmed === currentName) return state
+      if (state.draft.macros.some((m, i) => i !== index && m.name === trimmed)) {
+        return state
+      }
+      const renamed = renameMacroRefs(state.draft, currentName, trimmed)
+      const nextDraft: EditorDraft = {
+        ...renamed,
+        macros: renamed.macros.map((m, i) =>
+          i === index ? { ...m, name: trimmed } : m,
+        ),
+      }
+      return {
+        ...state,
+        draft: nextDraft,
+        past: pushHistory(state.past, state.draft),
+        future: [],
+      }
+    }
 
     case 'UPDATE_BEHAVIOR':
       return mutateDraft(state, (d) => {

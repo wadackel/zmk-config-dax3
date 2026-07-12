@@ -61,7 +61,7 @@ export function DirectionPad({ block, selected, onSelect, onCreate }: DirectionP
   return (
     <div
       class="grid gap-3 items-center justify-items-center"
-      style="grid-template-columns:168px 172px 168px; grid-template-rows:96px 172px 96px;"
+      style="grid-template-columns:172px 172px 172px; grid-template-rows:140px 172px 140px;"
     >
       {DIRECTION_ORDER.map((pattern) => {
         const meta = DIRECTION_META[pattern]
@@ -117,21 +117,21 @@ function DirectionCard({
       onClick={onClick}
       class={[
         meta.grid,
-        'w-full h-full flex flex-col gap-1.5 items-start px-3.5 py-3 bg-surface-0 rounded-xl text-left transition-shadow',
+        'w-full flex flex-col gap-[6px] items-start px-[13px] py-[11px] bg-white rounded-[7px] text-left transition-shadow box-border',
         isSelected
-          ? 'border-2 border-accent shadow-[var(--shadow-focus-ring)]'
-          : 'border border-border shadow-[var(--shadow-key)] hover:shadow-[var(--shadow-key-hover)]',
+          ? 'border-[1.5px] border-accent shadow-[0_0_0_3px_rgba(79,91,107,.12)]'
+          : 'border border-[rgba(22,24,29,.12)] shadow-[0_1px_2px_rgba(22,24,29,.05)] hover:shadow-md',
       ].join(' ')}
     >
       <span
         class={[
-          'text-[10px] font-mono font-semibold tracking-wider',
+          'text-[10px] font-mono font-semibold uppercase tracking-[.08em] leading-none',
           isSelected ? 'text-accent' : 'text-fg-subtle',
         ].join(' ')}
       >
         {meta.symbol} {meta.label}
       </span>
-      <span class="text-[13px] font-mono font-semibold text-fg break-all">
+      <span class="text-[13px] font-mono font-semibold leading-none text-fg break-all">
         {entry.bindings.tokens.join(' ') || '&none'}
       </span>
     </button>
@@ -147,15 +147,11 @@ function CenterTrackball() {
       />
       <div class="absolute inset-[22px] rounded-full border border-border-subtle" />
       <div class="absolute inset-[44px] rounded-full border border-border-subtle" />
-      <div
-        class="absolute inset-[10px] rounded-full border-2 border-transparent border-t-accent animate-[dax3-spin-dial_3.4s_cubic-bezier(.5,.15,.3,1)_infinite]"
-        aria-hidden="true"
-      />
-      <div class="absolute inset-[56px] rounded-full bg-surface-0 border border-border-subtle flex flex-col items-center justify-center gap-0.5 shadow-[var(--shadow-key)]">
-        <span class="text-[8px] font-mono font-semibold tracking-[.12em] text-fg-subtle">
+      <div class="absolute inset-[56px] rounded-full bg-white border border-[rgba(22,24,29,.1)] flex flex-col items-center justify-center gap-[2px] shadow-[0_1px_3px_rgba(22,24,29,.06)]">
+        <span class="text-[8px] font-mono font-semibold tracking-[.12em] leading-none text-fg-subtle">
           TRACKBALL
         </span>
-        <span class="text-[12px] font-semibold">Gesture</span>
+        <span class="text-[12px] font-semibold leading-none text-fg">Gesture</span>
       </div>
       <span
         class="absolute left-1/2 top-1/2 w-2 h-2 rounded-full bg-accent shadow-[0_0_8px_rgb(79_91_107/0.5)] animate-[dax3-gesture-trail_2.4s_ease-out_infinite]"
@@ -163,25 +159,25 @@ function CenterTrackball() {
       />
       <span
         aria-hidden="true"
-        class="absolute top-1.5 left-1/2 -translate-x-1/2 text-[10px] font-mono text-[color:var(--color-border-strong)]"
+        class="absolute top-1.5 left-1/2 -translate-x-1/2 text-[10px] font-mono text-[#c2c5cc]"
       >
         ▲
       </span>
       <span
         aria-hidden="true"
-        class="absolute bottom-1.5 left-1/2 -translate-x-1/2 text-[10px] font-mono text-[color:var(--color-border-strong)]"
+        class="absolute bottom-1.5 left-1/2 -translate-x-1/2 text-[10px] font-mono text-[#c2c5cc]"
       >
         ▼
       </span>
       <span
         aria-hidden="true"
-        class="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[color:var(--color-border-strong)]"
+        class="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#c2c5cc]"
       >
         ◀
       </span>
       <span
         aria-hidden="true"
-        class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[color:var(--color-border-strong)]"
+        class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#c2c5cc]"
       >
         ▶
       </span>

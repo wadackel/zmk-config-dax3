@@ -1,196 +1,233 @@
 import { useEditor } from '../../../lib/editor-state/context'
-import type { BehaviorEntry, LayerData } from '../../../lib/keymap-dt/types'
+import type { BehaviorEntry } from '../../../lib/keymap-dt/types'
 import {
   checkScrlVal,
   checkTapMs,
   checkTriggersPerRotation,
-  describeEncoderRotation,
   extractScrlVal,
   getEncScrollTapMs,
   SHIELD_STEPS,
   SHIELD_TRIGGERS_PER_ROTATION,
-  type HintResult,
 } from '../../../lib/sensor-hints'
-import { InspectorShell } from '../../../components/editor/inspector-shell'
-import { Slider } from '../../../components/ui/slider'
+import { Button } from '../../../components/ui/button'
+import { CommittingTextInput } from '../../../components/ui/field'
+import { SensorsIcon } from '../../../components/editor/nav-icons'
 
 const MSC_PERIOD_MS = 16 // enc_scroll.tap-ms must be ≥ this for scroll events to fire.
+const TAP_MS_MAX = 80
+
+export type SensorTuningDockProps = {
+  /** Which encoder is currently focused. Used in the identity summary. */
+  encoderIdx: 0 | 1
+}
 
 /**
- * Right-panel tuning + rules pane for the Sensors tab. Consists of:
- *   1. **Sensor config** — read-only summary (triggers-per-rotation from
- *      the shield DTS, SCRL_VAL from the keymap #define, tap-ms from the
- *      enc_scroll behaviour).
- *   2. **Editable tap-ms slider** — the one value we can actually change
- *      from within the editor. Slider range respects the MSC 16 ms floor.
- *   3. **CLAUDE.md rules** — surfaces the same HintResult that
- *      `sensor-hints.ts` computes, mapping ok/warn/error to visual tone.
- *   4. **All-layers summary** — one row per layer showing the encoder 0/1
- *      binding roll-up.
+ * Bottom-dock tuning strip for the Sensors tab. Layout:
+ *   - Identity (left): encoder chip + "Encoder N · left/right" + a rules
+ *     status pill that aggregates the three sensor-hints checks.
+ *   - Fields (center): TRIGGERS-PER-ROTATION and SCRL_VAL are read-only —
+ *     they live outside the keymap file (shield DTS + #define) so the
+ *     dock cannot round-trip edits without touching those sources. Only
+ *     TAP-MS is editable via the existing `UPDATE_BEHAVIOR` action.
+ *   - Actions (right): Reset (revert TAP-MS to the MSC 16 ms floor). No
+ *     Apply button — edits commit immediately on the CommittingTextInput,
+ *     so an Apply row would be a placeholder that adds a step users don't
+ *     need to take.
+ *
+ * The richer per-layer summary and CLAUDE.md rule cards from the previous
+ * right-panel version were dropped because the dock is a single row — a
+ * future iteration may surface them as an expandable helper panel.
  */
-export function SensorTuningInspector() {
+export function SensorTuningDock({ encoderIdx }: SensorTuningDockProps) {
   const { state, dispatch } = useEditor()
   const behaviors = state.draft.behaviors
   const scrlVal = extractScrlVal(state.baselineSource)
   const tapMs = getEncScrollTapMs(behaviors)
   const encScrollIdx = behaviors.findIndex((b) => b.name === 'enc_scroll')
   const encScrollDefined = encScrollIdx >= 0
+  const activeLayer = state.draft.layers[state.activeLayerIdx]
 
   const tapMsHint = checkTapMs(tapMs)
   const scrlValHint = checkScrlVal(scrlVal)
   const tprHint = checkTriggersPerRotation(SHIELD_TRIGGERS_PER_ROTATION, SHIELD_STEPS)
-  const allHints = [tapMsHint, scrlValHint, tprHint]
-  const rulesLevel: 'ok' | 'warn' | 'error' = allHints.some((h) => h.level === 'error')
+  const rulesLevel: 'ok' | 'warn' | 'error' = [tapMsHint, scrlValHint, tprHint].some(
+    (h) => h.level === 'error',
+  )
     ? 'error'
-    : allHints.some((h) => h.level === 'warn')
+    : [tapMsHint, scrlValHint, tprHint].some((h) => h.level === 'warn')
       ? 'warn'
       : 'ok'
 
+  const encoderLabel = encoderIdx === 0 ? 'left' : 'right'
+
   const setTapMs = (nextMs: number) => {
     if (encScrollIdx < 0) return
+    const clamped = Math.max(MSC_PERIOD_MS, Math.min(TAP_MS_MAX, nextMs))
     const target = behaviors[encScrollIdx]
     const nextProps = target.props.map((p) =>
-      p.name === 'tap-ms' ? { ...p, value: `<${nextMs}>` } : p,
+      p.name === 'tap-ms' ? { ...p, value: `<${clamped}>` } : p,
     )
     const behavior: BehaviorEntry = { ...target, props: nextProps }
     dispatch({ type: 'UPDATE_BEHAVIOR', index: encScrollIdx, behavior })
   }
 
   return (
-    <InspectorShell
-      title="Tuning"
-      ariaLabel="Sensor tuning"
-      headerRight={
+    <div class="contents">
+      <div class="flex-none flex items-center gap-3 pr-5 border-r border-border-subtle">
+        <div
+          aria-hidden="true"
+          class="w-[46px] h-[46px] flex-none rounded-full border-[1.5px] border-accent bg-[rgba(79,91,107,.07)] shadow-[0_0_0_3px_rgba(79,91,107,.1)] flex items-center justify-center text-accent [&_svg]:w-[22px] [&_svg]:h-[22px] box-border"
+        >
+          <SensorsIcon />
+        </div>
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center gap-2">
+            <span class="text-[13px] font-semibold text-fg">
+              Encoder {encoderIdx} · {encoderLabel}
+            </span>
+            <RulesPill level={rulesLevel} />
+          </div>
+          <span class="text-[11px] font-mono text-fg-subtle whitespace-nowrap">
+            layer {state.activeLayerIdx} · {activeLayer?.name ?? '—'}
+          </span>
+        </div>
+      </div>
+
+      <div class="flex-1 min-w-0 flex flex-wrap items-end gap-x-5 gap-y-4 px-5">
+        <ReadOnlyField
+          label="TRIGGERS-PER-ROTATION"
+          value={String(SHIELD_TRIGGERS_PER_ROTATION)}
+          hint={tprHint.level === 'ok' ? undefined : tprHint.message}
+          hintLevel={tprHint.level}
+        />
+        <div class="flex flex-col gap-[6px]">
+          <span
+            class={[
+              'font-mono font-semibold text-[8.5px] leading-none uppercase tracking-[.06em]',
+              tapMsHint.level === 'error'
+                ? 'text-danger'
+                : tapMsHint.level === 'warn'
+                  ? 'text-warning'
+                  : 'text-fg-subtler',
+            ].join(' ')}
+          >
+            TAP-MS
+          </span>
+          {encScrollDefined ? (
+            <div class="flex items-center justify-between w-[104px] px-[12px] py-[8px] border border-[rgba(22,24,29,.14)] rounded-[6px] bg-white box-border">
+              <CommittingTextInput
+                type="number"
+                inputMode="numeric"
+                min={MSC_PERIOD_MS}
+                max={TAP_MS_MAX}
+                value={String(tapMs ?? MSC_PERIOD_MS)}
+                class="!w-full !min-w-0 !border-0 !bg-transparent !p-0 font-mono font-semibold !text-[13px] !leading-none text-fg !shadow-none focus:!ring-0"
+                aria-label="tap-ms"
+                aria-describedby="tap-ms-hint"
+                onCommit={(v) => {
+                  if (v === '') return
+                  setTapMs(Number(v))
+                }}
+              />
+              <span
+                id="tap-ms-hint"
+                class="text-[9.5px] font-medium leading-none text-fg-subtler ml-2 shrink-0"
+              >
+                ms
+              </span>
+            </div>
+          ) : (
+            <span class="text-[11px] text-fg-subtle italic max-w-[200px]">
+              enc_scroll undefined — create in Behaviors tab
+            </span>
+          )}
+        </div>
+        <ReadOnlyField
+          label="SCRL_VAL"
+          value={scrlVal !== null ? String(scrlVal) : '—'}
+          hint={scrlValHint.level === 'ok' ? undefined : scrlValHint.message}
+          hintLevel={scrlValHint.level}
+        />
+      </div>
+
+      <div class="flex-none flex items-center gap-2 pl-3">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => setTapMs(MSC_PERIOD_MS)}
+          disabled={!encScrollDefined}
+        >
+          Reset
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function ReadOnlyField({
+  label,
+  value,
+  hint,
+  hintLevel,
+}: {
+  label: string
+  value: string
+  hint?: string
+  hintLevel: 'ok' | 'warn' | 'error'
+}) {
+  const labelColor =
+    hintLevel === 'error'
+      ? 'text-danger'
+      : hintLevel === 'warn'
+        ? 'text-warning'
+        : 'text-fg-subtler'
+  const isWide = label === 'TRIGGERS-PER-ROTATION'
+  return (
+    <div class={`flex flex-col gap-[6px] ${isWide ? 'min-w-[220px]' : 'min-w-[104px]'}`}>
+      <span
+        class={[
+          'font-mono font-semibold text-[8.5px] leading-none uppercase tracking-[.06em]',
+          labelColor,
+        ].join(' ')}
+      >
+        {label}
+      </span>
+      <div class={`flex items-center px-[12px] py-[9px] rounded-[6px] border border-[rgba(22,24,29,.14)] bg-white box-border font-mono font-semibold text-[13px] leading-none text-fg ${isWide ? 'w-[220px]' : 'w-[104px]'}`}>
+        {value}
+      </div>
+      {hint && (
         <span
           class={[
-            'inline-flex items-center gap-1.5 text-[11px] font-medium',
-            rulesLevel === 'ok'
-              ? 'text-success'
-              : rulesLevel === 'warn'
-                ? 'text-warning'
-                : 'text-danger',
+            'text-[10.5px] leading-snug',
+            hintLevel === 'error' ? 'text-danger' : 'text-warning',
           ].join(' ')}
         >
-          <span
-            aria-hidden="true"
-            class={[
-              'w-[7px] h-[7px] rounded-full',
-              rulesLevel === 'ok'
-                ? 'bg-success'
-                : rulesLevel === 'warn'
-                  ? 'bg-warning'
-                  : 'bg-danger',
-            ].join(' ')}
-          />
-          {rulesLevel === 'ok' ? 'rules OK' : rulesLevel === 'warn' ? 'rules warn' : 'rules error'}
+          {hint}
         </span>
-      }
-    >
-      <>
-        {/* SENSOR CONFIG */}
-        <div class="flex flex-col gap-2">
-          <span class="text-[10.5px] font-mono font-semibold tracking-wider text-fg-subtle">
-            SENSOR CONFIG
-          </span>
-          <div class="flex flex-col divide-y divide-border-subtle border border-border-subtle rounded-xl overflow-hidden bg-surface-0">
-            <SummaryRow label="triggers-per-rotation" value={SHIELD_TRIGGERS_PER_ROTATION} />
-            <SummaryRow label="tap-ms" value={tapMs ?? '—'} />
-            <SummaryRow label="SCRL_VAL" value={scrlVal ?? '—'} />
-          </div>
-        </div>
-
-        {/* EDITABLE SLIDER */}
-        {encScrollDefined ? (
-          <Slider
-            value={tapMs ?? MSC_PERIOD_MS}
-            min={MSC_PERIOD_MS}
-            max={80}
-            step={1}
-            onChange={setTapMs}
-            label="tap-ms"
-            unit="ms"
-            hint={`enc_scroll event period. Below ${MSC_PERIOD_MS}ms no scroll event fires.`}
-          />
-        ) : (
-          <div class="p-3 rounded-lg bg-warning-soft border border-warning/40 text-[11.5px] text-fg">
-            enc_scroll behaviour is undefined — tap-ms cannot be edited. Create it in the Behaviors tab.
-          </div>
-        )}
-
-        {/* CLAUDE.MD RULES */}
-        <div class="flex flex-col gap-2">
-          <span class="text-[10.5px] font-mono font-semibold tracking-wider text-fg-subtle">
-            CLAUDE.md RULES
-          </span>
-          <RuleCard hint={tapMsHint} okMessage={`tap-ms=${tapMs ?? '—'} within recommended range (≥ ${MSC_PERIOD_MS}ms)`} />
-          <RuleCard hint={scrlValHint} okMessage={`SCRL_VAL=${scrlVal ?? '—'} clears the macOS threshold`} />
-          <RuleCard
-            hint={tprHint}
-            okMessage={`triggers-per-rotation=${SHIELD_TRIGGERS_PER_ROTATION} is an integer divisor of steps=${SHIELD_STEPS}`}
-          />
-        </div>
-
-        {/* PER-LAYER SUMMARY */}
-        <div class="flex flex-col gap-2">
-          <span class="text-[10.5px] font-mono font-semibold tracking-wider text-fg-subtle">
-            THIS ENCODER, ALL LAYERS
-          </span>
-          <div class="flex flex-col gap-1.5">
-            {state.draft.layers.map((l, i) => (
-              <PerLayerRow key={l.name} idx={i} layer={l} />
-            ))}
-          </div>
-        </div>
-      </>
-    </InspectorShell>
-  )
-}
-
-function SummaryRow({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div class="flex items-center justify-between px-3 py-2.5">
-      <span class="text-[12.5px] text-fg-muted">{label}</span>
-      <span class="text-[13px] font-mono font-semibold text-fg">{value}</span>
+      )}
     </div>
   )
 }
 
-function RuleCard({ hint, okMessage }: { hint: HintResult; okMessage: string }) {
-  const level = hint.level
-  const styles =
+function RulesPill({ level }: { level: 'ok' | 'warn' | 'error' }) {
+  const style =
     level === 'ok'
-      ? 'bg-success-soft border-success/30 text-[color:var(--color-success)]'
+      ? 'text-success'
       : level === 'warn'
-        ? 'bg-warning-soft border-warning/30 text-[color:var(--color-warning)]'
-        : 'bg-danger-soft border-danger/30 text-[color:var(--color-danger)]'
-  const symbol = level === 'ok' ? '✓' : level === 'warn' ? '△' : '⚠︎'
+        ? 'text-warning'
+        : 'text-danger'
+  const dot =
+    level === 'ok'
+      ? 'bg-success'
+      : level === 'warn'
+        ? 'bg-warning'
+        : 'bg-danger'
+  const label =
+    level === 'ok' ? 'rules OK' : level === 'warn' ? 'rules warn' : 'rules error'
   return (
-    <div class={['flex items-start gap-2 p-2.5 rounded-lg border', styles].join(' ')}>
-      <span class="text-[12px] font-mono font-semibold leading-tight mt-0.5">{symbol}</span>
-      <span class="text-[11.5px] leading-snug text-fg">
-        {level === 'ok' ? okMessage : hint.message}
-      </span>
-    </div>
-  )
-}
-
-function PerLayerRow({ idx, layer }: { idx: number; layer: LayerData }) {
-  const bindings = layer.sensorBindings?.perEncoder
-  // Parser guarantees a 2-element perEncoder tuple when present, but hostile
-  // keymaps can produce shorter lists; guard both indices instead of `!`.
-  const enc0Chain = bindings?.[0]
-  const enc1Chain = bindings?.[1]
-  const enc0 = enc0Chain ? describeEncoderRotation(enc0Chain) : null
-  const enc1 = enc1Chain ? describeEncoderRotation(enc1Chain) : null
-  const summary = bindings
-    ? enc0 && enc1
-      ? `${enc0.ccw} / ${enc0.cw}`
-      : enc0Chain?.tokens.join(' ') || '—'
-    : '— inherits'
-  return (
-    <div class="flex items-center gap-2 p-2 rounded-lg border border-border-subtle bg-surface-0">
-      <span class="text-[10px] font-mono text-fg-subtle w-3">{idx}</span>
-      <span class="text-[11.5px] font-mono text-fg-muted truncate">{summary}</span>
-    </div>
+    <span class={['inline-flex items-center gap-1 text-[10px]', style].join(' ')}>
+      <span aria-hidden="true" class={['w-[6px] h-[6px] rounded-full', dot].join(' ')} />
+      {label}
+    </span>
   )
 }

@@ -12,13 +12,14 @@ import type {
 } from '../../lib/keymap-dt/types'
 import { BehaviorList, type BehaviorSelection } from './behaviors/behavior-list'
 import { PropGrid, type PropRow } from './behaviors/prop-grid'
-import { BehaviorAddPropInspector } from './inspector/behavior-add-prop-inspector'
+import { BehaviorAddPropDock } from './inspector/behavior-add-prop-inspector'
+import { DockShell } from '../../components/editor/dock-shell'
 
 /**
- * Behaviors tab redesign. Three-column shell:
+ * Behaviors tab redesign. Two-column shell + bottom dock:
  *   - Left: BehaviorList (GLOBAL &mt/&lt + CUSTOM)
  *   - Center: header + schema-driven PropGrid
- *   - Right: BehaviorAddPropInspector — search + suggested + custom raw
+ *   - Bottom dock: BehaviorAddPropDock — search + suggested + custom raw
  *
  * `getBehaviorSchema(compatible)` / `getRootBehaviorSchema(kind)` yield the
  * schema rows; unused rows surface as suggestions in the Add pane.
@@ -126,21 +127,24 @@ export function BehaviorsTab() {
       : ''
 
   return (
-    <div class="flex-1 min-h-0 min-w-0 flex bg-surface-0">
-      <BehaviorList
-        root={rootBehaviors}
-        custom={behaviors}
-        active={selection}
-        onSelect={setSelection}
-      />
+    <div class="flex-1 min-h-0 min-w-0 flex flex-col bg-surface-0">
+      <div class="flex-1 min-h-0 flex overflow-hidden">
+        <BehaviorList
+          root={rootBehaviors}
+          custom={behaviors}
+          active={selection}
+          onSelect={setSelection}
+        />
 
-      <div class="flex-1 bg-surface-3 flex flex-col min-w-0 overflow-auto p-8 gap-5">
-        <div class="flex items-center gap-3 flex-wrap">
-          <span class="text-[22px] font-mono font-bold leading-tight tracking-tight">
-            {headerTitle}
-          </span>
-          <span class="text-[12px] text-fg-subtle">{headerSubtitle}</span>
-          <span class="ml-auto text-[11px] font-mono text-fg-subtle bg-surface-4 rounded-md px-2 py-1">
+        <div class="flex-1 bg-surface-3 flex flex-col min-w-0 overflow-auto p-8 gap-5">
+        <div class="flex items-center gap-3">
+          <div class="min-w-0 flex-1 flex items-baseline gap-3">
+            <span class="text-[22px] font-mono font-bold leading-tight tracking-tight truncate">
+              {headerTitle}
+            </span>
+            <span class="text-[12px] text-fg-subtle truncate">{headerSubtitle}</span>
+          </div>
+          <span class="flex-none text-[11px] font-mono text-fg-subtle bg-surface-4 rounded-md px-2 py-1 truncate max-w-[280px]">
             {headerBadge}
           </span>
         </div>
@@ -183,33 +187,34 @@ export function BehaviorsTab() {
           />
         )}
 
-        <div class="flex items-center gap-2 text-[11.5px] text-fg-subtle">
-          <span class="text-success font-mono">✓</span>
-          Fields generated from behavior-prop-schema.ts. Unknown properties can be edited as raw.
+          <div class="flex items-center gap-2 text-[11.5px] text-fg-subtle">
+            <span class="text-success font-mono">✓</span>
+            Fields generated from behavior-prop-schema.ts. Unknown properties can be edited as raw.
+          </div>
         </div>
       </div>
 
-      <BehaviorAddPropInspector
-        suggestions={[...suggestions]}
-        onAddKnown={(s) => {
-          // Seed the new prop with a schema-appropriate initial value so
-          // adding a row does not immediately serialize an empty DT value.
-          // bool = presence-only flag; int/int-ms = min bound (or 0);
-          // enum = first option; raw = empty string for the user to fill.
-          const kind = s.kind
-          if (kind.type === 'bool') {
-            updateProp(s.name, '')
-          } else if (kind.type === 'int' || kind.type === 'int-ms') {
-            updateProp(s.name, `<${kind.min ?? 0}>`)
-          } else if (kind.type === 'enum') {
-            const first = kind.options[0]
-            updateProp(s.name, first ? `"${first}"` : '')
-          } else {
-            updateProp(s.name, '')
-          }
-        }}
-        onAddCustom={(name, value) => updateProp(name, value)}
-      />
+      <DockShell ariaLabel="Add behaviour property">
+        <BehaviorAddPropDock
+          suggestions={[...suggestions]}
+          onAddKnown={(s) => {
+            // Seed the new prop with a schema-appropriate initial value so
+            // adding a row does not immediately serialize an empty DT value.
+            const kind = s.kind
+            if (kind.type === 'bool') {
+              updateProp(s.name, '')
+            } else if (kind.type === 'int' || kind.type === 'int-ms') {
+              updateProp(s.name, `<${kind.min ?? 0}>`)
+            } else if (kind.type === 'enum') {
+              const first = kind.options[0]
+              updateProp(s.name, first ? `"${first}"` : '')
+            } else {
+              updateProp(s.name, '')
+            }
+          }}
+          onAddCustom={(name, value) => updateProp(name, value)}
+        />
+      </DockShell>
     </div>
   )
 }

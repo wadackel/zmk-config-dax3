@@ -3,6 +3,9 @@ import { Button } from '../../../components/ui/button'
 import { Dialog } from '../../../components/ui/dialog'
 import { useEditor } from '../../../lib/editor-state/context'
 
+const OUTLINED_ACTION =
+  'flex items-center gap-2 px-2.5 py-2 rounded-md border border-border bg-surface-0 text-[12px] font-medium text-fg-muted text-left transition-colors hover:text-fg hover:bg-surface-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-surface-0'
+
 /**
  * Left column of the Sensors tab. Shows every layer as a selectable row and
  * exposes bulk operations that scope this tab's edits:
@@ -53,7 +56,7 @@ export function LayerSelectorColumn() {
             >
               <span
                 class={[
-                  'text-[11px] font-mono font-semibold w-3 text-right',
+                  'text-[11px] font-mono font-semibold',
                   isActive ? 'text-[color:var(--color-ink-fg)]/60' : 'text-fg-subtle',
                 ].join(' ')}
               >
@@ -73,24 +76,22 @@ export function LayerSelectorColumn() {
 
         <div class="mt-4 pt-4 border-t border-border-subtle flex flex-col gap-2">
           <span class="text-[11.5px] text-fg-subtle">This layer's config…</span>
-          <Button
-            size="sm"
-            variant="ghost"
-            class="justify-start"
+          <button
+            type="button"
+            class={OUTLINED_ACTION}
             disabled={sourceLayers.length === 0}
             onClick={() => setCopyFromOpen(true)}
           >
-            ↓ Copy from…
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            class="justify-start"
+            <span aria-hidden="true">⇩</span> Copy from…
+          </button>
+          <button
+            type="button"
+            class={OUTLINED_ACTION}
             disabled={!layers[activeIdx]?.sensorBindings}
             onClick={() => setApplyAllOpen(true)}
           >
-            ⇅ Apply to all layers
-          </Button>
+            <span aria-hidden="true">⇅</span> Apply to all layers
+          </button>
         </div>
       </aside>
 

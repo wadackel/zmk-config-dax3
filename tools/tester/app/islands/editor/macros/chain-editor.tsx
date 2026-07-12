@@ -1,6 +1,10 @@
+import { useState } from 'hono/jsx'
+import { CommittingTextInput } from '../../../components/ui/field'
 import { MiniCode } from '../../../components/ui/mini-code'
 import type { BindingChain, MacroEntry } from '../../../lib/keymap-dt/types'
 import { isSimpleChain } from './macro-shape'
+
+const DT_IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 const INSERT_BEHAVIOURS: { token: string; label: string }[] = [
   { token: '&kp', label: '&kp' },
@@ -16,6 +20,7 @@ export type ChainEditorProps = {
   onSelectStep: (idx: number) => void
   onInsertStep: (idx: number, chain: BindingChain) => void
   onRemoveStep: (idx: number) => void
+  onRename: (name: string) => void
 }
 
 /**
@@ -31,12 +36,33 @@ export function ChainEditor({
   onSelectStep,
   onInsertStep,
   onRemoveStep,
+  onRename,
 }: ChainEditorProps) {
   const preview = buildRawPreview(macro)
+  // `CommittingTextInput` (defined in components/ui/field.tsx) keeps the local
+  // buffer until `externalValue` changes, so a reducer that rejects the commit
+  // (duplicate name, empty string, invalid identifier) would leave the input
+  // showing text that no longer matches the model. Bumping the key on every
+  // commit re-mounts the input, forcing its local state to re-seed from
+  // `macro.name`. On accept the seed is the new name (visible); on reject it
+  // is the old name (visible revert). UI-side identifier check short-circuits
+  // the dispatch for obviously bad input so the undo stack stays clean.
+  const [nameAttempt, setNameAttempt] = useState(0)
+  const handleRename = (next: string) => {
+    setNameAttempt((n) => n + 1)
+    if (!DT_IDENT.test(next.trim())) return
+    onRename(next)
+  }
   return (
     <div class="flex-1 flex flex-col gap-5 px-8 py-5 min-w-0 overflow-auto">
       <div class="flex items-baseline gap-3">
-        <span class="text-[15px] font-semibold text-fg">{macro.name}</span>
+        <CommittingTextInput
+          key={`${macro.name}#${nameAttempt}`}
+          class="font-mono !py-1.5 !text-[15px] !font-semibold !max-w-[240px]"
+          aria-label="Macro name"
+          value={macro.name}
+          onCommit={handleRename}
+        />
         <span class="text-[11px] text-fg-subtle">
           {macro.bindingsList.length} step{macro.bindingsList.length === 1 ? '' : 's'} · click a step to edit
         </span>

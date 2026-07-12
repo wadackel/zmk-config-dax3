@@ -40,20 +40,10 @@ const PROP_KIND_BADGE: Record<PropKind['type'], string> = {
  */
 export function PropGrid({ rows, onChange }: PropGridProps) {
   return (
-    <div class="bg-surface-0 border border-border rounded-xl overflow-hidden shadow-[var(--shadow-key)]">
-      <div class="grid" style="grid-template-columns: 220px 1fr;">
-        {rows.map((row, i) => {
-          const isLast = i === rows.length - 1
-          return (
-            <PropRowRender
-              key={row.schema.name}
-              row={row}
-              onChange={onChange}
-              isLast={isLast}
-            />
-          )
-        })}
-      </div>
+    <div class="flex flex-col gap-3">
+      {rows.map((row) => (
+        <PropRowRender key={row.schema.name} row={row} onChange={onChange} />
+      ))}
     </div>
   )
 }
@@ -61,27 +51,31 @@ export function PropGrid({ rows, onChange }: PropGridProps) {
 function PropRowRender({
   row,
   onChange,
-  isLast,
 }: {
   row: PropRow
   onChange: (name: string, rawValue: string | undefined) => void
-  isLast: boolean
 }) {
-  const borderClass = isLast ? '' : 'border-b border-border-subtle'
   const kind = row.schema.kind
 
+  // Each prop is now an independent card, so users can scan the panel
+  // vertically without visually threading through a single boxed
+  // divider grid — closer to a Claude Design "cards" pattern than a
+  // dense table.
   return (
-    <>
-      <div class={['px-5 py-4 flex flex-col gap-0.5', borderClass].join(' ')}>
+    <div
+      class="grid bg-surface-0 border border-border rounded-card overflow-hidden shadow-[var(--shadow-key)]"
+      style="grid-template-columns: 220px minmax(0, 1fr);"
+    >
+      <div class="px-5 py-4 flex flex-col gap-0.5">
         <span class="text-[13px] font-semibold text-fg">{row.schema.name}</span>
         <span class="text-[10.5px] font-mono text-fg-subtle">
           {PROP_KIND_BADGE[kind.type]}
         </span>
       </div>
-      <div class={['px-5 py-3.5 flex items-center gap-3', borderClass].join(' ')}>
+      <div class="px-5 py-3.5 flex items-center gap-3 border-l border-border-subtle">
         <PropEditor row={row} onChange={onChange} />
       </div>
-    </>
+    </div>
   )
 }
 

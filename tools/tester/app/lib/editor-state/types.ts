@@ -79,6 +79,7 @@ export type EditorAction =
   | { type: 'ADD_MACRO' }
   | { type: 'UPDATE_MACRO'; index: number; macro: MacroEntry }
   | { type: 'REMOVE_MACRO'; index: number }
+  | { type: 'RENAME_MACRO'; index: number; name: string }
   | { type: 'UPDATE_BEHAVIOR'; index: number; behavior: BehaviorEntry }
   | { type: 'UPDATE_ROOT_BEHAVIOR'; index: number; cfg: RootBehaviorConfig }
   | { type: 'UPDATE_MOUSE_GESTURE'; index: number; block: MouseGestureBlock }

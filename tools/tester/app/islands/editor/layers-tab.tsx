@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'hono/jsx'
+import { useEffect, useRef, useState } from 'hono/jsx'
 import { KeyCap } from '../../components/ui/key-cap'
 import type { KeyCapState } from '../../components/ui/key-cap'
 import { useEditor } from '../../lib/editor-state/context'
@@ -6,8 +6,10 @@ import { KEYS } from '../../lib/layout'
 import { KeyboardGrid } from '../../components/keyboard-grid'
 import type { BindingChain } from '../../lib/keymap-dt/types'
 import { formatBindingForCell, mainLineSizeClass } from '../../lib/binding-display'
-import { BindingInspector } from './inspector/binding-inspector'
+import { BindingDock } from './inspector/binding-inspector'
 import { LayerList } from './layers/layer-list'
+import { ExportPanel } from './layers/export-panel'
+import { DockShell } from '../../components/editor/dock-shell'
 
 // Monotonic per-mount token. Each LayersTab instance grabs the next value
 // from a lazy useState initializer (see below) so incrementing does not
@@ -34,6 +36,13 @@ export function LayersTab() {
   const [hoveredKeyIdx, setHoveredKeyIdx] = useState<number | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null)
   const [mode, setMode] = useState<EditMode>('edit')
+  const [exportOpen, setExportOpen] = useState(false)
+  const exportChipRef = useRef<HTMLButtonElement | null>(null)
+
+  const closeExport = () => {
+    setExportOpen(false)
+    queueMicrotask(() => exportChipRef.current?.focus())
+  }
   // Paste-target selection used in Copy mode: click toggles membership, then
   // Cmd/Ctrl+V commits a single bulk paste to every selected cell.
   const [selectedKeyIdxs, setSelectedKeyIdxs] = useState<Set<number>>(new Set())
@@ -102,6 +111,11 @@ export function LayersTab() {
         .querySelector<HTMLElement>('[role="tab"][data-editor-tab="layers"]')
         ?.getAttribute('aria-selected') === 'true'
       if (!layersActive) return
+      if (e.key === 'Escape' && exportOpen) {
+        e.preventDefault()
+        closeExport()
+        return
+      }
       if (
         e.key === 'Escape' &&
         selectedKeyIdx === null &&
@@ -162,6 +176,7 @@ export function LayersTab() {
     mode,
     selectedKeyIdxs,
     instanceToken,
+    exportOpen,
   ])
 
   useEffect(() => {
@@ -208,123 +223,126 @@ export function LayersTab() {
     }
   }
 
+  const renderKeyCell = (k: (typeof KEYS)[number]) => {
+    const binding = activeLayer.bindings[k.index]
+    const display = binding
+      ? formatBindingForCell(binding)
+      : { topLine: '', mainLine: '', faint: true }
+    const isHovered = hoveredKeyIdx === k.index
+    const isCopySelected = selectedKeyIdxs.has(k.index)
+    const isEditSelected = selectedKeyIdx === k.index
+    const isTrans =
+      binding && binding.tokens.length === 1 && binding.tokens[0] === '&trans'
+    const isMod =
+      binding &&
+      binding.tokens.length > 0 &&
+      binding.tokens[0].startsWith('&') &&
+      binding.tokens[0] !== '&kp' &&
+      binding.tokens[0] !== '&trans' &&
+      binding.tokens[0] !== '&none'
+    const capState: KeyCapState = isEditSelected
+      ? 'selected'
+      : isCopySelected
+        ? 'clip-target'
+        : isHovered
+          ? mode === 'copy'
+            ? state.clipboard
+              ? 'clip-target'
+              : 'clip-source'
+            : 'hover'
+          : isTrans
+            ? 'trans'
+            : isMod
+              ? 'mod'
+              : 'idle'
+    const mainColor = display.faint ? 'text-fg-subtle' : 'text-fg'
+    return (
+      <KeyCap
+        state={capState}
+        asButton
+        hoverable
+        interactive
+        class="relative"
+        title={binding ? binding.tokens.join(' ') : ''}
+        onClick={() => onKeyCellClick(k.index)}
+        onMouseEnter={() => setHoveredKeyIdx(k.index)}
+        onMouseLeave={() => setHoveredKeyIdx((cur) => (cur === k.index ? null : cur))}
+        onContextMenu={(e: MouseEvent) => {
+          e.preventDefault()
+          setContextMenu({ x: e.clientX, y: e.clientY, keyIdx: k.index })
+        }}
+      >
+        {display.topLine && (
+          <span class="absolute top-0.5 inset-x-1 text-[8px] text-fg-subtle leading-none truncate text-left">
+            {display.topLine}
+          </span>
+        )}
+        <span class={`${mainLineSizeClass(display.mainLine)} ${mainColor}`}>
+          {display.mainLine}
+        </span>
+        {display.subLine && (
+          <span class="absolute bottom-0.5 inset-x-1 text-[8px] text-fg-subtle leading-none truncate">
+            {display.subLine}
+          </span>
+        )}
+      </KeyCap>
+    )
+  }
+
+  const selectedBinding =
+    selectedKeyIdx !== null ? activeLayer.bindings[selectedKeyIdx] : null
+
   return (
-    <div class="flex-1 min-h-0 min-w-0 flex bg-surface-0">
-      <LayerList />
-
-      <div class="flex-1 bg-surface-3 flex flex-col min-w-0 overflow-auto">
-        <BoardHeader
-          layerName={activeLayer.name}
-          layerIdx={state.activeLayerIdx}
-          mode={mode}
-          onToggleMode={() => setMode((m) => (m === 'copy' ? 'edit' : 'copy'))}
-          clipboardPreview={clipboardPreview}
-          selectedCount={selectedKeyIdxs.size}
-          onClearClipboard={() => dispatch({ type: 'SET_CLIPBOARD', chain: null })}
-        />
-
-        <div class="flex-1 flex items-start justify-center px-8 pt-4 pb-10 min-w-0">
-          <KeyboardGrid
-            keys={KEYS}
-            renderCell={(k) => {
-              const binding = activeLayer.bindings[k.index]
-              const display = binding
-                ? formatBindingForCell(binding)
-                : { topLine: '', mainLine: '', faint: true }
-              const isHovered = hoveredKeyIdx === k.index
-              const isCopySelected = selectedKeyIdxs.has(k.index)
-              const isEditSelected = selectedKeyIdx === k.index
-              const isTrans =
-                binding && binding.tokens.length === 1 && binding.tokens[0] === '&trans'
-              const isMod =
-                binding &&
-                binding.tokens.length > 0 &&
-                binding.tokens[0].startsWith('&') &&
-                binding.tokens[0] !== '&kp' &&
-                binding.tokens[0] !== '&trans' &&
-                binding.tokens[0] !== '&none'
-              const capState: KeyCapState = isEditSelected
-                ? 'selected'
-                : isCopySelected
-                  ? 'clip-target'
-                  : isHovered
-                    ? mode === 'copy'
-                      ? state.clipboard
-                        ? 'clip-target'
-                        : 'clip-source'
-                      : 'hover'
-                    : isTrans
-                      ? 'trans'
-                      : isMod
-                        ? 'mod'
-                        : 'idle'
-              const mainColor = display.faint ? 'text-fg-subtle' : 'text-fg'
-              return (
-                <KeyCap
-                  state={capState}
-                  asButton
-                  hoverable
-                  interactive
-                  class="relative"
-                  title={binding ? binding.tokens.join(' ') : ''}
-                  onClick={() => onKeyCellClick(k.index)}
-                  onMouseEnter={() => setHoveredKeyIdx(k.index)}
-                  onMouseLeave={() => setHoveredKeyIdx((cur) => (cur === k.index ? null : cur))}
-                  onContextMenu={(e: MouseEvent) => {
-                    e.preventDefault()
-                    setContextMenu({ x: e.clientX, y: e.clientY, keyIdx: k.index })
-                  }}
-                >
-                  {display.topLine && (
-                    <span class="absolute top-0.5 inset-x-1 text-[8px] text-fg-subtle leading-none truncate text-left">
-                      {display.topLine}
-                    </span>
-                  )}
-                  <span class={`${mainLineSizeClass(display.mainLine)} ${mainColor}`}>
-                    {display.mainLine}
-                  </span>
-                  {display.subLine && (
-                    <span class="absolute bottom-0.5 inset-x-1 text-[8px] text-fg-subtle leading-none truncate">
-                      {display.subLine}
-                    </span>
-                  )}
-                </KeyCap>
-              )
-            }}
+    <div class="flex-1 min-h-0 min-w-0 flex flex-col bg-surface-0">
+      <div class="flex-1 min-h-0 flex overflow-hidden">
+        <LayerList />
+        <div class="flex-1 bg-surface-3 flex flex-col min-w-0 overflow-auto">
+          <BoardHeader
+            layerName={activeLayer.name}
+            layerIdx={state.activeLayerIdx}
+            mode={mode}
+            onToggleMode={() => setMode((m) => (m === 'copy' ? 'edit' : 'copy'))}
+            clipboardPreview={clipboardPreview}
+            selectedCount={selectedKeyIdxs.size}
+            onClearClipboard={() => dispatch({ type: 'SET_CLIPBOARD', chain: null })}
+            exportOpen={exportOpen}
+            onToggleExport={() => setExportOpen((v) => !v)}
+            exportChipRef={exportChipRef}
           />
+          <div class="flex-1 flex items-center justify-center px-8 py-6 min-w-0">
+            <KeyboardGrid keys={KEYS} renderCell={renderKeyCell} />
+          </div>
         </div>
+        {exportOpen && (
+          <ExportPanel
+            layers={state.draft.layers}
+            draft={state.draft}
+            onClose={closeExport}
+          />
+        )}
       </div>
 
-      {selectedKeyIdx !== null && activeLayer.bindings[selectedKeyIdx] && (
-        <BindingInspector
-          keyIdx={selectedKeyIdx}
-          initial={activeLayer.bindings[selectedKeyIdx]}
-          onCancel={() => setSelectedKeyIdx(null)}
-          onCommit={(chain) => {
-            dispatch({
-              type: 'UPDATE_BINDING',
-              layerIdx: state.activeLayerIdx,
-              keyIdx: selectedKeyIdx,
-              chain,
-            })
-            setSelectedKeyIdx(null)
-          }}
-        />
-      )}
-
-      {selectedKeyIdx === null && (
-        <aside
-          class="w-[356px] flex-none border-l border-border-subtle bg-surface-1 flex flex-col items-center justify-center p-8 text-center gap-3"
-          aria-label="Binding editor (empty)"
-        >
-          <span class="text-[13px] font-semibold text-fg-muted">Select a key to edit</span>
-          <span class="text-[11px] text-fg-subtle leading-relaxed">
-            Click a keycap to edit its binding in the Inspector.
-            <br />
-            Copy mode lets you select cells and paste them in bulk.
-          </span>
-        </aside>
-      )}
+      <DockShell ariaLabel="Layers binding editor">
+        {selectedBinding && selectedKeyIdx !== null ? (
+          <BindingDock
+            key={selectedKeyIdx}
+            keyIdx={selectedKeyIdx}
+            initial={selectedBinding}
+            onCancel={() => setSelectedKeyIdx(null)}
+            onCommit={(chain) => {
+              dispatch({
+                type: 'UPDATE_BINDING',
+                layerIdx: state.activeLayerIdx,
+                keyIdx: selectedKeyIdx,
+                chain,
+              })
+              setSelectedKeyIdx(null)
+            }}
+          />
+        ) : (
+          <DockEmptyState />
+        )}
+      </DockShell>
 
       {contextMenu && (
         <ContextMenu
@@ -358,6 +376,31 @@ export function LayersTab() {
   )
 }
 
+function DockEmptyState() {
+  return (
+    <div class="flex items-center gap-4 min-h-[68px]">
+      <div class="w-[58px] h-[58px] flex-none border-[1.5px] border-dashed border-[rgba(22,24,29,.2)] rounded-[7px] flex items-center justify-center box-border">
+        <span
+          class="w-[16px] h-[16px] border-2 border-fg-subtler rounded-[4px] inline-block"
+          aria-hidden="true"
+        />
+      </div>
+      <div class="flex flex-col gap-1">
+        <span class="text-[13.5px] font-semibold text-fg-muted leading-none">
+          No key selected
+        </span>
+        <span class="text-[12px] text-fg-subtle leading-[1.5]">
+          Click a keycap on the board — or press{' '}
+          <kbd class="inline-block px-[4px] py-[1px] font-mono font-semibold text-[10.5px] leading-none text-fg-muted bg-[rgba(22,24,29,.05)] rounded-[3px]">
+            ↵
+          </kbd>
+          {' '}to edit the focused key. Copy mode lets you paste to many at once.
+        </span>
+      </div>
+    </div>
+  )
+}
+
 type BoardHeaderProps = {
   layerName: string
   layerIdx: number
@@ -366,6 +409,9 @@ type BoardHeaderProps = {
   clipboardPreview: string
   selectedCount: number
   onClearClipboard: () => void
+  exportOpen: boolean
+  onToggleExport: () => void
+  exportChipRef: { current: HTMLButtonElement | null }
 }
 
 function BoardHeader({
@@ -376,9 +422,12 @@ function BoardHeader({
   clipboardPreview,
   selectedCount,
   onClearClipboard,
+  exportOpen,
+  onToggleExport,
+  exportChipRef,
 }: BoardHeaderProps) {
   return (
-    <div class="flex items-center justify-between px-8 pt-4 gap-4 flex-wrap">
+    <div class="flex items-center justify-between px-6 py-3 border-b border-border-subtle gap-4 flex-wrap">
       <div class="flex items-center gap-3">
         <span class="text-[14px] font-semibold text-fg">{layerName}</span>
         <span class="text-[11px] font-mono text-fg-subtle">layer {layerIdx}</span>
@@ -406,6 +455,34 @@ function BoardHeader({
         )}
         <button
           type="button"
+          ref={exportChipRef}
+          aria-pressed={exportOpen ? 'true' : 'false'}
+          onClick={onToggleExport}
+          title="Export layers as PNG"
+          class={[
+            'inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-[12.5px] transition-colors',
+            exportOpen
+              ? 'bg-accent text-accent-fg border-accent shadow-[0_1px_2px_rgb(79_91_107/0.35)]'
+              : 'bg-surface-0 border-border text-fg-muted hover:text-fg hover:bg-surface-2',
+          ].join(' ')}
+        >
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M8 2v7M5 6.5 8 9.5 11 6.5M3 12h10" />
+          </svg>
+          Export image
+        </button>
+        <button
+          type="button"
           aria-pressed={mode === 'copy' ? 'true' : 'false'}
           onClick={onToggleMode}
           class={[
@@ -430,9 +507,9 @@ function BoardHeader({
           {mode === 'copy'
             ? clipboardPreview
               ? selectedCount > 0
-                ? `Copy — ⌘V to paste into ${selectedCount}`
-                : 'Copy mode — click cells to select targets'
-              : 'Copy mode — pick source'
+                ? `Paste to ${selectedCount} · ⌘V`
+                : 'Pick targets'
+              : 'Pick source'
             : 'Copy mode'}
         </button>
       </div>
@@ -448,7 +525,7 @@ function Legend() {
   const items = [
     { swatch: 'bg-[color:var(--color-keycap-idle)] border-border', label: '&kp' },
     { swatch: 'bg-[color:var(--color-keycap-mod)] border-border', label: 'mod / layer-tap' },
-    { swatch: 'bg-[color:var(--color-keycap-trans)] border-dashed border-border-strong', label: '&trans' },
+    { swatch: 'bg-[color:var(--color-keycap-trans)] border-border-strong', label: '&trans' },
   ]
   return (
     <div class="flex items-center gap-4 text-[11px] text-fg-subtle">

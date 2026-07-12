@@ -1,9 +1,8 @@
 import { useState } from 'hono/jsx'
-import { Slider } from '../../../components/ui/slider'
+import { Button } from '../../../components/ui/button'
 import { Toggle } from '../../../components/ui/toggle'
 import { CommittingTextInput } from '../../../components/ui/field'
-import { InspectorShell } from '../../../components/editor/inspector-shell'
-import { BindingInspector } from './binding-inspector'
+import { BindingDock } from './binding-inspector'
 import { getDirectionMeta } from '../mouse-gestures/direction-pad'
 import type {
   BindingChain,
@@ -15,7 +14,7 @@ import type {
 const NUMBER_PROPS = [
   {
     key: 'stroke-size',
-    label: 'stroke-size',
+    label: 'STROKE-SIZE',
     unit: 'px',
     min: 1,
     max: 400,
@@ -23,7 +22,7 @@ const NUMBER_PROPS = [
   },
   {
     key: 'idle-timeout-ms',
-    label: 'idle-timeout-ms',
+    label: 'IDLE-TIMEOUT-MS',
     unit: 'ms',
     min: 0,
     max: 1000,
@@ -31,7 +30,7 @@ const NUMBER_PROPS = [
   },
   {
     key: 'gesture-cooldown-ms',
-    label: 'gesture-cooldown-ms',
+    label: 'COOLDOWN-MS',
     unit: 'ms',
     min: 0,
     max: 500,
@@ -39,7 +38,7 @@ const NUMBER_PROPS = [
   },
   {
     key: 'quick-tap-ms',
-    label: 'quick-tap-ms',
+    label: 'QUICK-TAP-MS',
     unit: 'ms',
     min: 0,
     max: 1000,
@@ -48,15 +47,19 @@ const NUMBER_PROPS = [
 ] as const
 
 const BOOLEAN_PROPS = [
-  { key: 'enable-eager-mode', label: 'eager-mode', hint: 'Fire as soon as the threshold is reached' },
+  {
+    key: 'enable-eager-mode',
+    label: 'EAGER-MODE',
+    hint: 'Fire as soon as the threshold is reached',
+  },
   {
     key: 'suppress-movement',
-    label: 'suppress-movement',
+    label: 'SUPPRESS',
     hint: 'Suppress raw pointer movement during a stroke',
   },
   {
     key: 'always-active',
-    label: 'always-active',
+    label: 'ALWAYS-ACT',
     hint: 'Ignore layer gating on the input-processor',
   },
 ] as const
@@ -99,7 +102,7 @@ const upsertEntry = (
   return entries.map((e, i) => (i === idx ? entry : e))
 }
 
-export type GestureInspectorProps = {
+export type GestureDockProps = {
   block: MouseGestureBlock
   selected: MouseGesturePattern | null
   onChange: (next: MouseGestureBlock) => void
@@ -107,20 +110,24 @@ export type GestureInspectorProps = {
 }
 
 /**
- * Right panel for the Mouse Gestures tab. Two modes:
- *   1. **Property mode** (default) — surfaces gesture-wide DT properties
- *      (stroke-size slider, idle/cooldown/quick-tap number fields, three
- *      boolean toggles) for the entire block.
- *   2. **Binding-edit mode** — when the user clicks Change binding… the
- *      panel swaps for a BindingInspector; committing writes the new
- *      binding into the selected pattern's entry.
+ * Bottom-dock gesture editor. Two modes:
+ *   1. Property mode (default) — surfaces gesture-wide DT properties
+ *      (4 number fields + 3 boolean toggles + selected-direction chip
+ *      with an edit-name field).
+ *   2. Binding-edit mode — when the user clicks Change binding… the dock
+ *      body swaps for a {@link BindingDock} dock variant; committing
+ *      writes the new binding into the selected pattern's entry.
+ *
+ * Both number and boolean prop sets remain complete (the plan preserves
+ * NUMBER_PROPS + BOOLEAN_PROPS). The dock wraps them into a single
+ * flex-row instead of the previous vertical stack.
  */
-export function GestureInspector({
+export function GestureDock({
   block,
   selected,
   onChange,
   onDeselect,
-}: GestureInspectorProps) {
+}: GestureDockProps) {
   const [editingBinding, setEditingBinding] = useState(false)
 
   const selectedEntry = selected
@@ -144,7 +151,8 @@ export function GestureInspector({
 
   if (editingBinding && selected && selectedEntry) {
     return (
-      <BindingInspector
+      <BindingDock
+        key={`gesture-${selected}`}
         targetLabel={`${selected} stroke`}
         targetSubtitle={selectedEntry.name}
         initial={selectedEntry.bindings}
@@ -155,44 +163,138 @@ export function GestureInspector({
   }
 
   return (
-    <InspectorShell
-      title="Properties"
-      ariaLabel="Gesture properties"
-      headerRight={
-        <span class="text-[10.5px] font-mono text-fg-subtle">
-          {block.kind === 'root' ? 'root block' : block.name}
-        </span>
-      }
-    >
-      <>
-        {/* SELECTED DIRECTION */}
+    <div class="contents">
+      <div class="flex-none flex items-center gap-3 pr-5 border-r border-border-subtle">
         {selected && selectedEntry ? (
-          <div class="flex flex-col gap-2">
-            <span class="text-[10.5px] font-mono font-semibold tracking-wider text-fg-subtle">
-              SELECTED DIRECTION
-            </span>
-            <div class="flex items-center gap-3 p-3 rounded-xl bg-accent-soft border border-accent">
-              <span class="w-9 h-9 shrink-0 rounded-lg bg-surface-0 border border-accent flex items-center justify-center text-[16px] font-mono text-accent">
-                {getDirectionMeta(selected).symbol}
-              </span>
-              <div class="flex flex-col gap-0.5 min-w-0">
-                <span class="text-[12.5px] font-semibold">{selected} stroke</span>
-                <span class="text-[10.5px] font-mono text-fg-muted truncate">
-                  {selectedEntry.bindings.tokens.join(' ')}
-                </span>
-              </div>
+          <>
+            <div class="w-[46px] h-[46px] flex-none rounded-[8px] border-[1.5px] border-accent bg-[rgba(79,91,107,.09)] shadow-[0_0_0_3px_rgba(79,91,107,.12)] flex items-center justify-center text-[18px] font-mono font-semibold text-accent leading-none box-border">
+              {getDirectionMeta(selected).symbol}
             </div>
+            <div class="flex flex-col gap-[5px]">
+              <div class="flex items-center gap-2">
+                <span class="text-[13.5px] font-semibold leading-none text-fg">
+                  {selected} stroke
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange({
+                      ...block,
+                      entries: block.entries.filter((e) => e.pattern !== selected),
+                    })
+                    onDeselect()
+                  }}
+                  class="text-[11px] font-mono leading-none text-danger hover:brightness-95"
+                >
+                  Remove
+                </button>
+              </div>
+              <span class="text-[11px] font-mono font-medium leading-none text-fg-subtle whitespace-nowrap">
+                {block.kind === 'root' ? 'root block' : 'named block'} ·{' '}
+                {block.kind === 'root' ? '&zip_mouse_gesture' : block.name}
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div class="w-[46px] h-[46px] flex-none border-[1.5px] border-dashed border-[rgba(22,24,29,.2)] rounded-[8px] flex items-center justify-center box-border">
+              <span class="text-fg-subtler font-semibold text-[15px] leading-none">◈</span>
+            </div>
+            <span class="text-[11.5px] font-medium text-fg-subtle max-w-[220px] leading-[1.5]">
+              Select a direction card to edit its binding and per-block properties.
+            </span>
+          </>
+        )}
+      </div>
+
+      <div class="flex-1 min-w-0 flex flex-wrap items-end gap-x-5 gap-y-4 px-5">
+        {selected && selectedEntry && (
+          <div class="flex flex-col gap-[6px]">
+            <span class="font-mono font-semibold text-[8.5px] leading-none uppercase tracking-[.06em] text-fg-subtler">
+              BINDING
+            </span>
             <button
               type="button"
               onClick={() => setEditingBinding(true)}
-              class="flex items-center justify-between px-3 py-2.5 border border-border rounded-lg bg-surface-0 text-[13px] font-mono text-fg hover:bg-surface-2 transition-colors"
+              aria-label={`Edit ${selected} stroke binding: ${
+                selectedEntry.bindings.tokens.join(' ') || '&none'
+              }`}
+              class="flex items-center gap-[7px] w-[180px] px-[12px] py-[9px] border border-[rgba(22,24,29,.14)] rounded-[6px] bg-white hover:bg-surface-2 transition-colors box-border"
             >
-              <span>Change binding…</span>
-              <span class="text-fg-subtle text-[11px]">▾</span>
+              <span class="truncate font-mono font-semibold text-[13px] leading-none text-fg flex-1 text-left">
+                {selectedEntry.bindings.tokens.join(' ') || '&none'}
+              </span>
+              <span class="text-[11px] leading-none text-fg-subtler shrink-0" aria-hidden="true">
+                ▾
+              </span>
             </button>
-            <div class="flex flex-col gap-1.5">
-              <span class="text-[10.5px] text-fg-subtle">Entry name (DT identifier)</span>
+          </div>
+        )}
+
+        {selected && selectedEntry && NUMBER_PROPS.map((p) => {
+          const currentRaw = findProp(block, p.key)?.value
+          const currentNum = parseIntValue(currentRaw)
+          return (
+            <div key={p.key} class="flex flex-col gap-[6px]" title={p.hint}>
+              <span class="font-mono font-semibold text-[8.5px] leading-none uppercase tracking-[.06em] text-fg-subtler">
+                {p.label}
+              </span>
+              <div class="flex items-center justify-between w-[110px] px-[12px] py-[8px] border border-[rgba(22,24,29,.14)] rounded-[6px] bg-white box-border">
+                <CommittingTextInput
+                  type="number"
+                  inputMode="numeric"
+                  min={p.min}
+                  max={p.max}
+                  value={currentNum !== null ? String(currentNum) : ''}
+                  class="!w-full !min-w-0 !border-0 !bg-transparent !p-0 font-mono font-semibold !text-[13px] !leading-none text-fg !shadow-none focus:!ring-0"
+                  aria-label={p.label}
+                  onCommit={(v) => {
+                    if (v === '') onChange(setPropValue(block, p.key, null))
+                    else onChange(setPropValue(block, p.key, `<${Number(v)}>`))
+                  }}
+                />
+                {p.unit && (
+                  <span class="text-[9.5px] font-medium leading-none text-fg-subtler ml-2 shrink-0">
+                    {p.unit}
+                  </span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+
+        {selected && selectedEntry && BOOLEAN_PROPS.map((p) => {
+          const on = findProp(block, p.key) !== undefined
+          return (
+            <div key={p.key} class="flex flex-col gap-[6px]" title={p.hint}>
+              <span class="font-mono font-semibold text-[8.5px] leading-none uppercase tracking-[.06em] text-fg-subtler">
+                {p.label}
+              </span>
+              <div class="flex items-center gap-[9px] h-[36px]">
+                <Toggle
+                  checked={on}
+                  onChange={(next) =>
+                    onChange(setPropValue(block, p.key, next ? '' : null))
+                  }
+                  ariaLabel={p.label}
+                />
+                <span class="text-[11.5px] font-medium leading-none text-fg-subtle">
+                  {on ? 'On' : 'Off'}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+
+        {selected && selectedEntry && (
+          <div class="flex flex-col gap-[6px]">
+            <span class="font-mono font-semibold text-[8.5px] leading-none uppercase tracking-[.06em] text-fg-subtler">
+              ENTRY NAME
+            </span>
+            <div class="flex items-center w-[160px] px-[12px] py-[8px] border border-[rgba(22,24,29,.14)] rounded-[6px] bg-white box-border">
               <CommittingTextInput
+                class="!w-full !min-w-0 !border-0 !bg-transparent !p-0 font-mono font-semibold !text-[13px] !leading-none text-fg !shadow-none focus:!ring-0"
+                aria-label="Direction entry name"
                 value={selectedEntry.name}
                 invalid={selectedEntry.name.trim() === ''}
                 onCommit={(name) => {
@@ -206,84 +308,17 @@ export function GestureInspector({
                 }}
               />
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                onChange({
-                  ...block,
-                  entries: block.entries.filter((e) => e.pattern !== selected),
-                })
-                onDeselect()
-              }}
-              class="self-start text-[11px] font-mono text-danger hover:brightness-95"
-            >
-              Remove direction
-            </button>
-          </div>
-        ) : (
-          <div class="text-[12px] text-fg-subtle">
-            Select a direction card to edit its binding.
           </div>
         )}
+      </div>
 
-        {/* GESTURE PROPERTIES */}
-        <div class="flex flex-col gap-4 pt-4 border-t border-border-subtle">
-          <span class="text-[10.5px] font-mono font-semibold tracking-wider text-fg-subtle">
-            GESTURE PROPERTIES
-          </span>
-
-          {NUMBER_PROPS.map((p) => {
-            const currentRaw = findProp(block, p.key)?.value
-            const currentNum = parseIntValue(currentRaw)
-            return (
-              <div key={p.key} class="flex flex-col gap-1.5">
-                <Slider
-                  value={currentNum ?? p.min}
-                  min={p.min}
-                  max={p.max}
-                  onChange={(next) =>
-                    onChange(setPropValue(block, p.key, `<${next}>`))
-                  }
-                  label={p.label}
-                  unit={p.unit}
-                  hint={p.hint}
-                />
-                {currentNum === null && (
-                  <button
-                    type="button"
-                    onClick={() => onChange(setPropValue(block, p.key, `<${p.min}>`))}
-                    class="self-start text-[10.5px] text-accent hover:brightness-95"
-                  >
-                    Set explicitly (currently using DT default)
-                  </button>
-                )}
-              </div>
-            )
-          })}
-
-          {BOOLEAN_PROPS.map((p) => {
-            const on = findProp(block, p.key) !== undefined
-            return (
-              <div
-                key={p.key}
-                class="flex items-center justify-between p-3 rounded-xl bg-surface-0 border border-border"
-              >
-                <div class="flex flex-col gap-0.5">
-                  <span class="text-[12.5px] font-semibold text-fg">{p.label}</span>
-                  <span class="text-[10.5px] text-fg-subtle">{p.hint}</span>
-                </div>
-                <Toggle
-                  checked={on}
-                  onChange={(next) =>
-                    onChange(setPropValue(block, p.key, next ? '' : null))
-                  }
-                  ariaLabel={p.label}
-                />
-              </div>
-            )
-          })}
-        </div>
-      </>
-    </InspectorShell>
+      <div class="flex-none flex items-center pl-3">
+        {selected ? (
+          <Button size="sm" variant="ghost" onClick={onDeselect}>
+            Close
+          </Button>
+        ) : null}
+      </div>
+    </div>
   )
 }

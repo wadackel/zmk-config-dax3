@@ -32,41 +32,27 @@ export function ModifierToggles({ active, onChange }: Props) {
     onChange(next)
   }
 
+  const visibleMods = showRight ? [...LEFT_MODS, ...RIGHT_MODS] : LEFT_MODS
+
   return (
-    <div class="mb-2">
-      <div class="flex items-center gap-1 mb-1">
-        <span class="text-[10px] text-fg-subtle mr-1">Modifier</span>
-        {LEFT_MODS.map((m) => (
-          <ModButton
-            key={m.wrap}
-            wrap={m.wrap}
-            label={m.label}
-            active={active.has(m.wrap)}
-            onToggle={() => toggle(m.wrap)}
-          />
-        ))}
-        <button
-          type="button"
-          class="ml-2 text-[10px] text-fg-subtle hover:text-fg-muted"
-          onClick={() => setShowRight((v) => !v)}
-        >
-          {showRight ? '− R-side' : '+ R-side'}
-        </button>
-      </div>
-      {showRight && (
-        <div class="flex items-center gap-1">
-          <span class="text-[10px] text-transparent mr-1">Modifier</span>
-          {RIGHT_MODS.map((m) => (
-            <ModButton
-              key={m.wrap}
-              wrap={m.wrap}
-              label={m.label}
-              active={active.has(m.wrap)}
-              onToggle={() => toggle(m.wrap)}
-            />
-          ))}
-        </div>
-      )}
+    <div class="flex items-center gap-1">
+      {visibleMods.map((m) => (
+        <ModButton
+          key={m.wrap}
+          wrap={m.wrap}
+          label={m.label}
+          active={active.has(m.wrap)}
+          onToggle={() => toggle(m.wrap)}
+        />
+      ))}
+      <button
+        type="button"
+        onClick={() => setShowRight((v) => !v)}
+        class="px-[6px] py-[7px] font-mono font-medium text-[10px] leading-none text-fg-subtler hover:text-fg-muted transition-colors"
+        title={showRight ? 'Hide right-side modifiers' : 'Show right-side modifiers'}
+      >
+        {showRight ? '−R' : '+R'}
+      </button>
     </div>
   )
 }
@@ -87,10 +73,10 @@ function ModButton({
       type="button"
       aria-pressed={active ? 'true' : 'false'}
       data-modwrap={wrap}
-      class={`px-2 py-0.5 rounded-md text-[11px] border font-mono ${
+      class={`px-[8px] py-[7px] rounded-[5px] font-mono font-semibold text-[10.5px] leading-none border transition-colors ${
         active
-          ? 'bg-accent text-accent-fg border-accent'
-          : 'bg-surface-0 text-fg-muted border-border hover:border-border-strong'
+          ? 'bg-accent text-accent-fg border-[1.5px] border-accent'
+          : 'bg-white text-fg-muted border-[rgba(22,24,29,.16)] hover:border-[rgba(22,24,29,.28)]'
       }`}
       onClick={onToggle}
     >

@@ -27,7 +27,7 @@ export function BehaviorList({ root, custom, active, onSelect }: BehaviorListPro
   return (
     <aside
       aria-label="Behaviors"
-      class="w-[236px] flex-none border-r border-border-subtle p-4 flex flex-col gap-1 overflow-auto"
+      class="w-[190px] flex-none border-r border-border-subtle p-4 flex flex-col gap-1 overflow-auto"
     >
       <span class="text-[10.5px] font-mono font-semibold tracking-wider text-fg-subtle px-1.5 pb-2">
         GLOBAL
@@ -89,7 +89,7 @@ export function BehaviorList({ root, custom, active, onSelect }: BehaviorListPro
           >
             <span
               class={[
-                'text-[13px] font-mono font-semibold',
+                'text-[13px] font-mono font-semibold truncate',
                 isActive ? '' : 'text-fg',
               ].join(' ')}
             >
@@ -97,7 +97,7 @@ export function BehaviorList({ root, custom, active, onSelect }: BehaviorListPro
             </span>
             <span
               class={[
-                'text-[10.5px]',
+                'text-[10.5px] truncate',
                 isActive ? 'text-[color:var(--color-ink-fg)]/60' : 'text-fg-subtle',
               ].join(' ')}
             >

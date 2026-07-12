@@ -637,6 +637,143 @@ describe('editor reducer', () => {
     })
   })
 
+  describe('RENAME_MACRO', () => {
+    function makeStateWithMacroRefs(): EditorState {
+      const draft: EditorDraft = {
+        ...emptyDraft(),
+        layers: [
+          {
+            name: 'default_layer',
+            bindings: [
+              { tokens: ['&macro_1'] },
+              { tokens: ['&kp', 'A'] },
+              { tokens: ['&macro_2'] },
+              ...Array.from({ length: 43 }, () => ({ tokens: ['&trans'] })),
+            ],
+            sensorBindings: {
+              perEncoder: [{ tokens: ['&macro_1'] }, { tokens: ['&trans'] }],
+            },
+          },
+        ],
+        combos: [
+          {
+            name: 'combo_1',
+            bindings: { tokens: ['&macro_1'] },
+            keyPositions: [0, 1],
+            layers: [0],
+          },
+        ],
+        macros: [
+          {
+            name: 'macro_1',
+            bindingsList: [{ tokens: ['&macro_tap'] }],
+            props: [{ name: 'compatible', value: '"zmk,behavior-macro"' }],
+          },
+          {
+            name: 'macro_2',
+            bindingsList: [{ tokens: ['&macro_1'] }],
+            props: [{ name: 'compatible', value: '"zmk,behavior-macro"' }],
+          },
+        ],
+        behaviors: [
+          {
+            name: 'bh_1',
+            compatible: '"zmk,behavior-hold-tap"',
+            props: [],
+            bindings: [{ tokens: ['&macro_1'] }, { tokens: ['&kp', 'B'] }],
+          },
+        ],
+        mouseGestures: [
+          {
+            kind: 'named',
+            name: 'mg_1',
+            props: [],
+            entries: [
+              {
+                name: 'mg_e1',
+                pattern: 'UP',
+                bindings: { tokens: ['&macro_1'] },
+              },
+            ],
+          },
+        ],
+      }
+      return { ...initialState(), draft }
+    }
+
+    it('renames the macro and cascades to every reference surface', () => {
+      const before = makeStateWithMacroRefs()
+      const after = reducer(before, {
+        type: 'RENAME_MACRO',
+        index: 0,
+        name: 'my_macro',
+      })
+      expect(after.draft.macros[0].name).toBe('my_macro')
+      expect(after.draft.macros[1].name).toBe('macro_2')
+      expect(after.draft.macros[1].bindingsList[0].tokens).toEqual(['&my_macro'])
+      expect(after.draft.layers[0].bindings[0].tokens).toEqual(['&my_macro'])
+      expect(after.draft.layers[0].bindings[2].tokens).toEqual(['&macro_2'])
+      expect(after.draft.layers[0].sensorBindings!.perEncoder[0].tokens).toEqual([
+        '&my_macro',
+      ])
+      expect(after.draft.combos[0].bindings.tokens).toEqual(['&my_macro'])
+      expect(after.draft.behaviors[0].bindings![0].tokens).toEqual(['&my_macro'])
+      expect(after.draft.mouseGestures[0].entries[0].bindings.tokens).toEqual([
+        '&my_macro',
+      ])
+      expect(after.past.length).toBe(1)
+    })
+
+    it('preserves nodeName when only name changes', () => {
+      const s = makeStateWithMacroRefs()
+      const withNode: EditorState = {
+        ...s,
+        draft: {
+          ...s.draft,
+          macros: s.draft.macros.map((m, i) =>
+            i === 0 ? { ...m, nodeName: 'legacy_node' } : m,
+          ),
+        },
+      }
+      const after = reducer(withNode, {
+        type: 'RENAME_MACRO',
+        index: 0,
+        name: 'shiny',
+      })
+      expect(after.draft.macros[0].name).toBe('shiny')
+      expect(after.draft.macros[0].nodeName).toBe('legacy_node')
+    })
+
+    it('rejects invalid DT identifiers (leading digit, spaces, punctuation)', () => {
+      const s = makeStateWithMacroRefs()
+      expect(reducer(s, { type: 'RENAME_MACRO', index: 0, name: '1macro' })).toBe(s)
+      expect(reducer(s, { type: 'RENAME_MACRO', index: 0, name: 'my macro' })).toBe(s)
+      expect(reducer(s, { type: 'RENAME_MACRO', index: 0, name: 'has-dash' })).toBe(s)
+    })
+
+    it('rejects an empty / whitespace-only name', () => {
+      const s = makeStateWithMacroRefs()
+      expect(reducer(s, { type: 'RENAME_MACRO', index: 0, name: '' })).toBe(s)
+      expect(reducer(s, { type: 'RENAME_MACRO', index: 0, name: '   ' })).toBe(s)
+    })
+
+    it('rejects a duplicate name silently', () => {
+      const s = makeStateWithMacroRefs()
+      expect(reducer(s, { type: 'RENAME_MACRO', index: 0, name: 'macro_2' })).toBe(s)
+    })
+
+    it('is a no-op when the name is unchanged', () => {
+      const s = makeStateWithMacroRefs()
+      expect(reducer(s, { type: 'RENAME_MACRO', index: 0, name: 'macro_1' })).toBe(s)
+    })
+
+    it('rejects an out-of-range index', () => {
+      const s = makeStateWithMacroRefs()
+      expect(reducer(s, { type: 'RENAME_MACRO', index: -1, name: 'ok' })).toBe(s)
+      expect(reducer(s, { type: 'RENAME_MACRO', index: 99, name: 'ok' })).toBe(s)
+    })
+  })
+
   describe('MOVE_LAYER default_layer guard', () => {
     it('rejects MOVE_LAYER when fromIdx is 0', () => {
       const s = makeState()

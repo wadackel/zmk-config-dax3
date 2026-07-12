@@ -116,7 +116,7 @@ export function LayerList() {
                     ? `Layer ${l.name} (locked at position 0)`
                     : `Layer ${l.name}. Enter to select, F2 to rename, Alt+↑/↓ to move`
                 }
-                draggable={!isRenaming && !isProtected}
+                draggable={!isRenaming && !isProtected ? 'true' : 'false'}
                 onDragStart={onDragStart(i)}
                 onDragOver={onDragOverRow(i)}
                 onDrop={onDrop}
@@ -188,7 +188,21 @@ export function LayerList() {
                     isActive ? 'text-[color:var(--color-ink-fg)]/50' : 'text-fg-subtle',
                   ].join(' ')}
                 >
-                  ⋮⋮
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="10"
+                    height="14"
+                    viewBox="0 0 10 14"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <circle cx="3" cy="3" r="1" />
+                    <circle cx="7" cy="3" r="1" />
+                    <circle cx="3" cy="7" r="1" />
+                    <circle cx="7" cy="7" r="1" />
+                    <circle cx="3" cy="11" r="1" />
+                    <circle cx="7" cy="11" r="1" />
+                  </svg>
                 </button>
                 <span
                   class={[

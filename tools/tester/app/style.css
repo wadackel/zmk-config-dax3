@@ -25,6 +25,9 @@
   /* AA-safe subtle grey — 4.6:1 on #ffffff, 3.1:1 on #f6f6f4. The earlier
      #9096a0 dropped below 3:1 at the small text sizes editor labels use. */
   --color-fg-subtle: #6a707a;
+  /* Even lighter grey, reserved for uppercase micro labels and disabled
+     glyphs where AA is not required (decorative). */
+  --color-fg-subtler: #b6bac2;
   --color-fg-inverse: #ffffff;
 
   --color-border-subtle: rgb(22 24 29 / 0.07);
@@ -72,11 +75,17 @@
   --radius-lg: 7px;
   --radius-xl: 10px;
 
+  /* Semantic radii for the icon-rail + bottom-dock redesign. */
+  --radius-input: 6px;
+  --radius-card: 8px;
+  --radius-panel: 9px;
+
   --shadow-key: 0 1px 2px rgb(22 24 29 / 0.05);
   --shadow-key-hover: 0 5px 14px rgb(22 24 29 / 0.14);
   --shadow-panel: 0 4px 12px rgb(22 24 29 / 0.08);
   --shadow-popover: 0 10px 30px rgb(22 24 29 / 0.14);
   --shadow-focus-ring: 0 0 0 3px var(--color-accent-ring);
+  --shadow-dock: 0 -8px 24px rgb(22 24 29 / 0.05);
 
   --font-sans:
     'Instrument Sans', ui-sans-serif, system-ui, -apple-system,
@@ -130,20 +139,12 @@
   }
 }
 
-/* Slow rotating accent stroke used inside the Mouse Gestures dial. */
-@keyframes dax3-spin-dial {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* Respect the user's OS-level motion preference — WCAG 2.2.2 requires a way
    to stop continuous animation, and Sensors / Mouse Gestures panels play
-   three infinite loops (dial spin, gesture trail, mouse dial). Falling back
-   to `animation: none` on prefers-reduced-motion satisfies the criterion. */
+   two infinite loops (gesture trail, encoder dial). Falling back to
+   `animation: none` on prefers-reduced-motion satisfies the criterion. */
 @media (prefers-reduced-motion: reduce) {
   .animate-\[dax3-spin-cw_11s_linear_infinite\],
-  .animate-\[dax3-spin-dial_3\.4s_cubic-bezier\(\.5\,\.15\,\.3\,1\)_infinite\],
   .animate-\[dax3-gesture-trail_2\.4s_ease-out_infinite\] {
     animation: none !important;
   }
@@ -152,11 +153,28 @@
 /*
  * HonoX inserts a `<honox-island>` custom element around every island render.
  * Custom elements default to `display: inline`, which breaks flex layouts
- * that need to grow through the island boundary (e.g. the editor's
- * `<div class="h-screen flex flex-col">` route shell that contains the
- * `<KeymapEditor />` island and expects it to fill the remaining vertical
- * space).
+ * that need to grow through the island boundary.
+ *
+ * `display: contents` looks like the simplest fix, but real Blink/WebKit
+ * builds treat a `display: contents` box as "not participating in flex
+ * layout"; a nested flex-column inside it collapses along the main axis
+ * for any child that lacks intrinsic size. The editor's NavRail 6-tab
+ * list is exactly this case: the outer `flex-col` inside
+ * `<aside w-[62px]>` has no explicit height, so its own flex-column
+ * children (the tablist wrapper) get clamped to 0. Headless Chromium
+ * happens to pick a larger initial height at paint time, so headless
+ * smoke tests do not catch the regression.
+ *
+ * Switching to `display: flex` with `flex: 1 1 0; min-height: 0` makes
+ * the island a real flex participant, preserving the intended cascade
+ * for both `<KeymapEditor />` (h-screen flex flex-col route shell) and
+ * `<KeyboardTester />` (h-screen overflow-auto route shell) — the
+ * former stretches to fill remaining height, the latter grows with its
+ * child content since `min-height: 0` gates the shrink behavior only.
  */
 honox-island {
-  display: contents;
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
 }

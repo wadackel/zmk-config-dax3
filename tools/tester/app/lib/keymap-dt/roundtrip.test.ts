@@ -7,6 +7,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { initialState, reducer } from '../editor-state/reducer'
 import { parseKeymap } from './parse'
 import { applyEdits, type Edit } from './patch'
 import {
@@ -100,6 +101,70 @@ describe('roundtrip', () => {
       expect(reparsed.behaviors[i].compatible).toBe(original.behaviors[i].compatible)
       expect(reparsed.behaviors[i].bindings).toEqual(original.behaviors[i].bindings)
     }
+  })
+
+  it('renaming a macro rewrites both its header label and every &<macro> reference', () => {
+    const original = parseKeymap(fixture)
+    const macroIdx = original.macros.findIndex((m) => m.name === 'esc_lang2')
+    expect(macroIdx).toBeGreaterThanOrEqual(0)
+
+    let state = reducer(initialState(), {
+      type: 'LOAD',
+      source: fixture,
+      mtimeMs: 0,
+      draft: {
+        layers: original.layers,
+        combos: original.combos,
+        macros: original.macros,
+        behaviors: original.behaviors,
+        mouseGestures: original.mouseGestures,
+        rootBehaviors: original.rootBehaviors,
+      },
+    })
+    state = reducer(state, { type: 'RENAME_MACRO', index: macroIdx, name: 'my_macro' })
+
+    expect(state.draft.macros[macroIdx].name).toBe('my_macro')
+    const behavior = state.draft.behaviors.find((b) => b.name === 'esc_lang2_with_layer')
+    expect(behavior?.bindings?.some((c) => c.tokens[0] === '&my_macro')).toBe(true)
+
+    const edits: Edit[] = []
+    const macrosContainer = original.sections.find((s) => s.kind === 'macros-container')
+    const behaviorsContainer = original.sections.find(
+      (s) => s.kind === 'behaviors-container',
+    )
+    if (!macrosContainer || !behaviorsContainer) throw new Error('containers missing')
+    const INDENT_ENTRY = '        '
+
+    const macroLines: string[] = ['']
+    for (let i = 0; i < state.draft.macros.length; i++) {
+      const m = state.draft.macros[i]
+      const nodeName = m.nodeName ?? m.name
+      macroLines.push(`${INDENT_ENTRY}${m.name}: ${nodeName} {${serializeMacro(m)}};`)
+      if (i < state.draft.macros.length - 1) macroLines.push('')
+    }
+    macroLines.push('    ')
+    edits.push({ range: macrosContainer.bodyRange, replacement: macroLines.join('\n') })
+
+    const behaviorLines: string[] = ['']
+    for (let i = 0; i < state.draft.behaviors.length; i++) {
+      const b = state.draft.behaviors[i]
+      const nodeName = b.nodeName ?? b.name
+      behaviorLines.push(`${INDENT_ENTRY}${b.name}: ${nodeName} {${serializeBehavior(b)}};`)
+      if (i < state.draft.behaviors.length - 1) behaviorLines.push('')
+    }
+    behaviorLines.push('    ')
+    edits.push({ range: behaviorsContainer.bodyRange, replacement: behaviorLines.join('\n') })
+
+    const emitted = applyEdits(fixture, edits)
+    const reparsed = parseKeymap(emitted)
+
+    expect(reparsed.macros.map((m) => m.name)).toContain('my_macro')
+    expect(reparsed.macros.map((m) => m.name)).not.toContain('esc_lang2')
+    const reparsedBehavior = reparsed.behaviors.find(
+      (b) => b.name === 'esc_lang2_with_layer',
+    )
+    expect(reparsedBehavior?.bindings?.some((c) => c.tokens[0] === '&my_macro')).toBe(true)
+    expect(reparsedBehavior?.bindings?.some((c) => c.tokens[0] === '&esc_lang2')).toBe(false)
   })
 
   it('content outside any section (comments, #define) is preserved byte-for-byte', () => {
