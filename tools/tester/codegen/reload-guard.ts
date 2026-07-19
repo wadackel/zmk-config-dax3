@@ -1,4 +1,6 @@
-const KEY = Symbol.for('dax3-keymap-reload-guard')
+import { branding } from '../app/boards/dax3/branding'
+
+const KEY = Symbol.for(branding.reloadGuardSymbolKey)
 
 type Guard = { suppressUntilMs: number }
 

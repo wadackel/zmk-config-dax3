@@ -115,9 +115,9 @@
 }
 
 /* Rotating dial animation used by the Sensors tab's EncoderDial. Declared
- * in the shared stylesheet so `animate-[dax3-spin-cw_...]` Tailwind arbitrary
+ * in the shared stylesheet so `animate-[kbd-spin-cw_...]` Tailwind arbitrary
  * class references resolve to a real keyframe rule. */
-@keyframes dax3-spin-cw {
+@keyframes kbd-spin-cw {
   to {
     transform: rotate(360deg);
   }
@@ -125,7 +125,7 @@
 
 /* Trackball motion trail used by the Mouse Gestures direction pad. Same
  * placement rationale as the encoder spin above. */
-@keyframes dax3-gesture-trail {
+@keyframes kbd-gesture-trail {
   0% {
     transform: translate(-50%, -50%) scale(0.4);
     opacity: 0;
@@ -144,8 +144,8 @@
    two infinite loops (gesture trail, encoder dial). Falling back to
    `animation: none` on prefers-reduced-motion satisfies the criterion. */
 @media (prefers-reduced-motion: reduce) {
-  .animate-\[dax3-spin-cw_11s_linear_infinite\],
-  .animate-\[dax3-gesture-trail_2\.4s_ease-out_infinite\] {
+  .animate-\[kbd-spin-cw_11s_linear_infinite\],
+  .animate-\[kbd-gesture-trail_2\.4s_ease-out_infinite\] {
     animation: none !important;
   }
 }

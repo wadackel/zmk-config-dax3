@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'hono/jsx'
-import { Button } from '../components/ui/button'
-import { ToastProvider } from '../components/ui/toast'
-import { NavRail, type NavRailItem } from '../components/editor/nav-rail'
+import { getBoard } from '../boards/active'
+import { Button } from '../ui/button'
+import { ToastProvider } from '../ui/toast'
+import { NavRail, type NavRailItem } from '../features/editor/shell/nav-rail'
 import {
   BehaviorsIcon,
   CombosIcon,
@@ -10,19 +11,19 @@ import {
   MouseGesturesIcon,
   SensorsIcon,
   TesterIcon,
-} from '../components/editor/nav-icons'
-import { EditorProvider, useEditor } from '../lib/editor-state/context'
-import { fetchKeymap } from '../lib/editor-state/io'
-import { ModalStackProvider, useModalStack } from '../lib/editor-state/modal-stack'
-import { parseKeymap } from '../lib/keymap-dt/parse'
-import type { EditorDraft, EditorTab } from '../lib/editor-state/types'
-import { BehaviorsTab } from './editor/behaviors-tab'
-import { CombosTab } from './editor/combos-tab'
-import { LayersTab } from './editor/layers-tab'
-import { MacrosTab } from './editor/macros-tab'
-import { MouseGesturesTab } from './editor/mouse-gestures-tab'
-import { SaveDialog } from './editor/save-dialog'
-import { SensorsTab } from './editor/sensors-tab'
+} from '../ui/nav-icons'
+import { EditorProvider, useEditor } from '../core/editor-state/context'
+import { fetchKeymap } from '../core/editor-state/io'
+import { ModalStackProvider, useModalStack } from '../ui/modal-stack'
+import { parseKeymap } from '../core/keymap-dt/parse'
+import type { EditorDraft, EditorTab } from '../core/editor-state/types'
+import { BehaviorsTab } from '../features/editor/tabs/behaviors/behaviors-tab'
+import { CombosTab } from '../features/editor/tabs/combos/combos-tab'
+import { LayersTab } from '../features/editor/tabs/layers/layers-tab'
+import { MacrosTab } from '../features/editor/tabs/macros/macros-tab'
+import { MouseGesturesTab } from '../features/editor/tabs/mouse-gestures/mouse-gestures-tab'
+import { SaveDialog } from '../features/editor/save/save-dialog'
+import { SensorsTab } from '../features/editor/tabs/sensors/sensors-tab'
 
 // The rail is the single source of truth for tab ordering + identity.
 // The editor's header title needs a longer human-readable label than the
@@ -51,15 +52,15 @@ const EDITOR_TAB_HEADER_LABEL: Record<EditorTab, string> = {
   'mouse-gestures': 'Mouse Gestures',
 }
 
-// Subtitle reflects the current draft's shape rather than a constant
-// "dax3 · 46 keys" so the header at a glance signals what the tab is
-// looking at (how many combos, how many layers, etc.). Each Claude
-// Design tab HTML surfaces this kind of scoped summary next to the
-// title.
+// Subtitle reflects the current draft's shape so the header at a glance
+// signals what the tab is looking at (combos, layers, etc.). Per-tab labels
+// that describe hardware come from the active board profile so a swap
+// picks up its own naming.
 function tabSubtitle(activeTab: EditorTab, draft: EditorDraft): string {
+  const board = getBoard()
   switch (activeTab) {
     case 'layers':
-      return `dax3 · 46 keys · ${draft.layers.length} layers`
+      return board.branding.subtitle(draft.layers.length)
     case 'combos':
       return draft.combos.length === 1
         ? '1 combo defined'
@@ -71,9 +72,9 @@ function tabSubtitle(activeTab: EditorTab, draft: EditorDraft): string {
     case 'behaviors':
       return `${draft.rootBehaviors.length} global · ${draft.behaviors.length} custom`
     case 'sensors':
-      return '2 rotary encoders'
+      return board.branding.encoderLabel
     case 'mouse-gestures':
-      return 'trackball · stroke directions'
+      return board.branding.gestureLabel
   }
 }
 

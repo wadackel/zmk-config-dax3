@@ -1,19 +1,19 @@
 import { useState, useEffect, useCallback } from 'hono/jsx'
-import { TesterIcon } from '../components/editor/nav-icons'
-import { KEYS } from '../lib/layout'
-import type { KeyDef } from '../lib/layout'
-import { resolveKeyboardEvent, resolveMouseEvent } from '../lib/keymap'
-import { createInitialState, getProgress } from '../lib/state'
-import type { TestState, KeyState, EventLogEntry } from '../lib/state'
-import { CHATTER_THRESHOLD_MS, detectChattering } from '../lib/chattering'
+import { TesterIcon } from '../ui/nav-icons'
+import { getBoard } from '../boards/active'
+import { KEYS } from '../core/layout'
+import type { KeyDef } from '../core/layout'
+import { resolveKeyboardEvent, resolveMouseEvent } from '../core/keymap-input'
+import { createInitialState, getProgress } from '../core/tester-state'
+import type { TestState, KeyState, EventLogEntry } from '../core/tester-state'
+import { CHATTER_THRESHOLD_MS, detectChattering } from '../core/chattering'
+import { MICRO_LABEL } from '../ui/micro-label'
 
 const LOG_MAX = 100
 const CELL_SIZE = 54
 const CELL_GAP = 7
 const HALF_OFFSET = -(CELL_SIZE + CELL_GAP) / 2
 
-const MICRO_LABEL =
-  "font-mono font-semibold text-[8.5px] leading-none uppercase tracking-[.09em] text-fg-subtler"
 
 type GridPos = { col: number; row: number; halfCol: boolean; halfRow: boolean }
 
@@ -723,7 +723,7 @@ export default function KeyboardTester() {
             <span class="w-px h-4 bg-border" aria-hidden="true" />
             <h1 class="text-[17px] font-bold m-0 tracking-tight">Keyboard Tester</h1>
             <span class="text-[11px] font-mono text-fg-subtle">
-              dax3 · {KEYS.length} keys · {tested}/{total} tested · {percent}%
+              {getBoard().branding.shortLabel} · {KEYS.length} keys · {tested}/{total} tested · {percent}%
             </span>
           </div>
           <button
@@ -745,7 +745,7 @@ export default function KeyboardTester() {
         >
           <div
             class="inline-grid mx-auto"
-            style={`grid-template-columns:repeat(16,${CELL_SIZE}px);grid-auto-rows:${CELL_SIZE}px;gap:${CELL_GAP}px;`}
+            style={`grid-template-columns:repeat(${getBoard().grid.testerGridInterleaveCols},${CELL_SIZE}px);grid-auto-rows:${CELL_SIZE}px;gap:${CELL_GAP}px;`}
           >
             {KEYS.map((keyDef) => (
               <GridKeyCell

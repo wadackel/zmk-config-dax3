@@ -1,16 +1,15 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Plugin } from 'vite'
-import { parseKeymap } from '../app/lib/keymap-dt/parse'
-import type { BindingChain } from '../app/lib/keymap-dt/types'
-import { checkMatrixIntegrity, DAX3_KEY_COUNT } from '../app/lib/matrix-mapping'
+import { keymapSource } from '../app/boards/dax3/keymap-source'
+import type { BindingChain } from '../app/core/keymap-dt/types'
 import { isReloadSuppressed } from './reload-guard'
 import { resolveEncoders, resolveKeys, type ParsedBinding } from './resolve'
 
 const VIRTUAL_MODULE_ID = 'virtual:zmk-layout'
 const RESOLVED_ID = '\0' + VIRTUAL_MODULE_ID
 
-interface DaxLayout {
+interface PhysicalLayoutJson {
   layouts: {
     default_layout: {
       layout: Array<{ x: number; y: number }>
@@ -32,27 +31,33 @@ export function zmkLayout(): Plugin {
   let repoRoot: string
 
   const getSourceFiles = () => ({
-    jsonPath: path.join(repoRoot, 'config/dax3.json'),
-    keymapPath: path.join(repoRoot, 'config/dax3.keymap'),
+    jsonPath: path.join(repoRoot, keymapSource.jsonRelative),
+    keymapPath: path.join(repoRoot, keymapSource.keymapRelative),
   })
 
-  const generateModule = () => {
+  const generateModule = async () => {
+    // Dynamic imports defer loading of parse.ts and boards/dax3/matrix (and
+    // their transitive board-profile chain) until plugin `load()` fires. Top-
+    // level imports here would pull `virtual:zmk-layout` at Node ESM config-
+    // load time, before Vite has registered any plugins that can resolve it.
+    const { parseKeymap } = await import('../app/core/keymap-dt/parse')
+    const { matrix: dax3Matrix } = await import('../app/boards/dax3/matrix')
     const { jsonPath, keymapPath } = getSourceFiles()
-    const layout = JSON.parse(fs.readFileSync(jsonPath, 'utf-8')) as DaxLayout
+    const layout = JSON.parse(fs.readFileSync(jsonPath, 'utf-8')) as PhysicalLayoutJson
     const keymapContent = fs.readFileSync(keymapPath, 'utf-8')
 
     const physicalLayout = layout.layouts.default_layout.layout
     const parsed = parseKeymap(keymapContent)
-    const defaultLayer = parsed.layers.find((l) => l.name === 'default_layer')
+    const defaultLayer = parsed.layers.find((l) => l.name === keymapSource.defaultLayerName)
     if (!defaultLayer) {
-      throw new Error('zmkLayout: default_layer not found in keymap')
+      throw new Error(`zmkLayout: ${keymapSource.defaultLayerName} not found in keymap`)
     }
     // A drift between the physical layout (dax3.json) and the matrix TRANSFORM
     // silently produces mis-indexed keys, so fail the build before resolveKeys
     // ever runs on mismatched data.
-    if (!checkMatrixIntegrity(physicalLayout.length)) {
+    if (!dax3Matrix.checkIntegrity(physicalLayout.length)) {
       throw new Error(
-        `zmkLayout: physical layout has ${physicalLayout.length} keys but the matrix TRANSFORM expects ${DAX3_KEY_COUNT}`,
+        `zmkLayout: physical layout has ${physicalLayout.length} keys but the matrix TRANSFORM expects ${dax3Matrix.keyCount}`,
       )
     }
     const bindings: ParsedBinding[] = defaultLayer.bindings.map(chainToParsedBinding)
@@ -79,9 +84,9 @@ export function zmkLayout(): Plugin {
       if (id === VIRTUAL_MODULE_ID) return RESOLVED_ID
     },
 
-    load(id) {
+    async load(id) {
       if (id !== RESOLVED_ID) return
-      return generateModule()
+      return await generateModule()
     },
 
     configureServer(server) {
