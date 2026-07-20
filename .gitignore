@@ -23,3 +23,6 @@ result-*
 # Tester
 tools/tester/node_modules/
 tools/tester/dist/
+
+# Editor auto-backup snapshots (created by tools/tester on first save)
+config/*.keymap.*.bak
