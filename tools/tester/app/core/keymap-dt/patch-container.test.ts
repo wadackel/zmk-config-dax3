@@ -72,6 +72,19 @@ describe('buildCandidateText', () => {
     expect(reparsed.macros[0].name).toBe(`${original.name}_renamed`)
   })
 
+  it('rename combo: rewrites the DT node identifier, keeps other combos intact', () => {
+    const draft = draftFromParsed(fixture)
+    expect(draft.combos.length).toBeGreaterThan(0)
+    const original = draft.combos[0]
+    const newName = `${original.name}_renamed`
+    draft.combos = [{ ...original, name: newName }, ...draft.combos.slice(1)]
+    const out = buildCandidateText(fixture, draft)
+    expect(out).toContain(`${newName} {`)
+    // Round-trip through parseKeymap.
+    const reparsed = parseKeymap(out)
+    expect(reparsed.combos.map((c) => c.name)).toEqual(draft.combos.map((c) => c.name))
+  })
+
   it('add mouse-gesture entry: entry is emitted inside the block body', () => {
     const draft = draftFromParsed(fixture)
     const rootBlock = draft.mouseGestures.find((b) => b.kind === 'root')
